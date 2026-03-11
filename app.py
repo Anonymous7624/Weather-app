@@ -9,8 +9,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from flask import jsonify
+
 from utils.config import get_config
-from utils.geocode import resolve_location
+from utils.geocode import resolve_location, suggest_locations
 from utils.nws import fetch_weather_data
 from utils.cache import get_cached_weather, set_cached_weather
 
@@ -57,6 +59,7 @@ def weather():
             location_input=location_input,
             config=config,
             is_favorite=is_favorite,
+            favorites=config.get_favorites(),
         )
 
     # Resolve location to lat/lon
@@ -97,6 +100,7 @@ def weather():
         location_input=location_input,
         config=config,
         is_favorite=is_favorite,
+        favorites=config.get_favorites(),
     )
 
 
@@ -110,6 +114,15 @@ def add_favorite():
         config.add_favorite(location)
         return {"ok": True}
     return {"ok": False}, 400
+
+
+@app.route("/api/geocode-suggest")
+def geocode_suggest():
+    """Return location suggestions for autocomplete."""
+    q = request.args.get("q", "").strip()
+    limit = min(int(request.args.get("limit", 8)), 10)
+    suggestions = suggest_locations(q, limit=limit)
+    return jsonify(suggestions)
 
 
 @app.route("/api/remove-favorite", methods=["POST"])

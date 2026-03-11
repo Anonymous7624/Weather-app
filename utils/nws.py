@@ -39,10 +39,12 @@ def fetch_weather_data(lat, lon, display_name):
     props = points.get("properties", {})
     forecast_url = props.get("forecast")
     hourly_url = props.get("forecastHourly")
+    obs_stations_url = props.get("observationStations")
+    forecast_grid_url = props.get("forecastGridData")
     if not forecast_url:
         return None
 
-    # Fetch forecast and hourly in parallel would require threading; keep it simple
+    # Fetch forecast and hourly
     forecast = _get(forecast_url) if forecast_url else None
     hourly = _get(hourly_url) if hourly_url else None
 
@@ -50,10 +52,28 @@ def fetch_weather_data(lat, lon, display_name):
     alerts_url = f"{NWS_BASE}/alerts/active?point={lat},{lon}"
     alerts_data = _get(alerts_url)
 
+    # Observations (for current conditions: temp, dewpoint, humidity, visibility, pressure)
+    observations_data = None
+    if obs_stations_url:
+        stations = _get(obs_stations_url)
+        if stations and "features" in stations and stations["features"]:
+            first_station = stations["features"][0]
+            station_id = first_station.get("properties", {}).get("stationIdentifier")
+            if station_id:
+                obs_url = f"{NWS_BASE}/stations/{station_id}/observations?limit=1"
+                observations_data = _get(obs_url)
+
+    # Grid data (for sunrise/sunset if available)
+    grid_data = _get(forecast_grid_url) if forecast_grid_url else None
+
     # Normalize into a clean structure
     return normalize_weather_data(
         display_name=display_name,
+        lat=lat,
+        lon=lon,
         forecast=forecast,
         hourly=hourly,
         alerts_data=alerts_data,
+        observations_data=observations_data,
+        grid_data=grid_data,
     )

@@ -9,11 +9,28 @@
         <p class="error-message">{{ message }}</p>
         <p class="error-suggestion">{{ suggestion }}</p>
         <form class="error-search" action="{{ url_for('weather') }}" method="get">
-            <input type="text" name="location" placeholder="Try another location" 
-                   value="{{ location_input|default('', true) }}" class="search-input">
-            <button type="submit" class="btn btn-primary">Search</button>
+            <div class="search-wrap">
+                <input type="text" name="location" placeholder="Try another location"
+                       value="{{ location_input|default('', true) }}" class="search-input"
+                       id="error-search-input">
+                <div id="error-suggestions" class="search-suggestions hidden" role="listbox"></div>
+            </div>
+            <div class="error-search-buttons">
+                <button type="submit" class="btn btn-primary">Search</button>
+                <button type="button" class="btn btn-secondary use-location-btn">📍 Use My Location</button>
+            </div>
         </form>
         <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Home</a>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        ClearerWeather.initAutocomplete('error-search-input', 'error-suggestions');
+        ClearerWeather.initUseLocation('.error-page .use-location-btn');
+    });
+</script>
 {% endblock %}
