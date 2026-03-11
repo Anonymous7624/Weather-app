@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Error – Clearer Weather{% endblock %}
+
+{% block content %}
+<div class="error-page">
+    <div class="error-card">
+        <h1>Something went wrong</h1>
+        <p class="error-message">{{ message }}</p>
+        <p class="error-suggestion">{{ suggestion }}</p>
+        <form class="error-search" action="{{ url_for('weather') }}" method="get">
+            <input type="text" name="location" placeholder="Try another location" 
+                   value="{{ location_input|default('', true) }}" class="search-input">
+            <button type="submit" class="btn btn-primary">Search</button>
+        </form>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Home</a>
+    </div>
+</div>
+{% endblock %}

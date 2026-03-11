@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Clearer Weather – Clean Forecasts for Raspberry Pi{% endblock %}
+
+{% block content %}
+<div class="landing">
+    <div class="landing-hero">
+        <h1>Clearer Weather</h1>
+        <p class="tagline">Clean, readable forecasts from the National Weather Service. No clutter, no ads.</p>
+    </div>
+
+    <form class="landing-search" action="{{ url_for('weather') }}" method="get">
+        <input type="text" name="location" placeholder="Enter ZIP code, city/state, or coordinates" 
+               value="{{ default_location }}" autocomplete="off" class="landing-input" required>
+        <button type="submit" class="btn btn-primary btn-lg">Get Forecast</button>
+    </form>
+
+    <p class="landing-hint">Examples: 90210, Boston MA, 42.36,-71.06</p>
+
+    {% if favorites %}
+    <section class="favorites-section">
+        <h2>Favorite Locations</h2>
+        <ul class="favorites-list">
+            {% for loc in favorites %}
+            <li><a href="{{ url_for('weather', location=loc) }}" class="fav-link">{{ loc }}</a></li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+
+    {% if recent_searches %}
+    <section class="recent-section">
+        <h2>Recent Searches</h2>
+        <ul class="recent-list">
+            {% for loc in recent_searches %}
+            <li><a href="{{ url_for('weather', location=loc) }}" class="recent-link">{{ loc }}</a></li>
+            {% endfor %}
+        </ul>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

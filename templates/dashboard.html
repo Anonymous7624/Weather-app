@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}{{ weather.location }} – Clearer Weather{% endblock %}
+
+{% block content %}
+<div class="dashboard" data-location="{{ location_input }}">
+    <h1 class="location-title">{{ weather.location }}</h1>
+
+    {% if weather.alerts %}
+    <section class="alerts-section">
+        <h2>Active Alerts</h2>
+        <div class="alerts-list">
+            {% for a in weather.alerts %}
+            <div class="alert-card severity-{{ a.severity|lower|default('unknown') }}">
+                <h3>{{ a.title }}</h3>
+                {% if a.severity %}<span class="severity-badge">{{ a.severity }}</span>{% endif %}
+                <p class="alert-summary">{{ a.summary }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% else %}
+    <section class="alerts-section no-alerts">
+        <p class="no-alerts-msg">No active alerts</p>
+    </section>
+    {% endif %}
+
+    <section class="current-section">
+        <h2>Current Conditions</h2>
+        <div class="current-card">
+            <div class="current-main">
+                {% if weather.current.icon %}<span class="current-icon">{{ weather.current.icon }}</span>{% endif %}
+                <span class="current-temp">{{ weather.current.temp }}</span>
+            </div>
+            <div class="current-details">
+                <p class="current-short">{{ weather.current.short_forecast }}</p>
+                <ul class="current-stats">
+                    <li>Wind: {{ weather.current.wind }}</li>
+                    <li>Precip chance: {{ weather.current.precipitation }}</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    {% if weather.best_time %}
+    <section class="best-time-section">
+        <h2>Best Time to Go Outside</h2>
+        <p class="best-time-summary">{{ weather.best_time }}</p>
+    </section>
+    {% endif %}
+
+    {% if weather.hourly %}
+    <section class="hourly-section">
+        <h2>Hourly Forecast</h2>
+        <div class="hourly-scroll">
+            {% for h in weather.hourly %}
+            <div class="hourly-card">
+                {% if h.icon %}<span class="hourly-icon">{{ h.icon }}</span>{% endif %}
+                <span class="hourly-time">{{ h.time }}</span>
+                <span class="hourly-temp">{{ h.temp }}</span>
+                <span class="hourly-desc">{{ h.short_forecast }}</span>
+                <span class="hourly-precip">Precip: {{ h.precip }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <section class="periods-section">
+        <h2>Extended Forecast</h2>
+        <div class="periods-grid">
+            {% for p in weather.periods %}
+            <div class="period-card {% if p.is_tonight %}highlight-tonight{% elif p.is_tomorrow %}highlight-tomorrow{% endif %}">
+                {% if p.icon %}<span class="period-icon">{{ p.icon }}</span>{% endif %}
+                <h3 class="period-name">{{ p.name }}</h3>
+                <span class="period-temp">{{ p.temp }}</span>
+                <p class="period-short">{{ p.short_forecast }}</p>
+                <ul class="period-meta">
+                    <li>Wind: {{ p.wind }}</li>
+                    <li>Precip: {{ p.precip_chance }}</li>
+                </ul>
+                {% if p.detailed_forecast %}
+                <p class="period-detailed">{{ p.detailed_forecast }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <div class="dashboard-actions">
+        <button type="button" class="btn btn-secondary add-favorite-btn" data-location="{{ location_input }}" {% if is_favorite %}disabled{% endif %}>
+            {% if is_favorite %}★ In Favorites{% else %}★ Add to Favorites{% endif %}
+        </button>
+        <a href="{{ url_for('weather', location=location_input) }}" class="btn btn-secondary refresh-link">Refresh</a>
+        <span class="auto-refresh-note">Auto-refresh: 10 min</span>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        ClearerWeather.initDashboard({
+            location: '{{ location_input|e }}',
+            refreshInterval: 600000
+        });
+    });
+</script>
+{% endblock %}
