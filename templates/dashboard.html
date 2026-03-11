@@ -4,22 +4,23 @@
 
 {% block content %}
 <div class="dashboard" data-location="{{ location_input }}" data-lat="{{ weather.lat|default('') }}" data-lon="{{ weather.lon|default('') }}">
-    <div class="dashboard-header">
+    <div class="dashboard-hero">
         <h1 class="location-title">{{ weather.location }}</h1>
-        {% if weather.lat is defined and weather.lon is defined and weather.lat is not none and weather.lon is not none %}
-        <a href="https://radar.weather.gov/?lat={{ weather.lat }}&lon={{ weather.lon }}" target="_blank" rel="noopener" class="btn btn-secondary radar-link">
-            🗺️ View Radar
-        </a>
-        {% else %}
-        <a href="https://radar.weather.gov/" target="_blank" rel="noopener" class="btn btn-secondary radar-link">
-            🗺️ View Radar
-        </a>
-        {% endif %}
+        <p class="location-updated">{% if weather.current.last_updated %}Updated {{ weather.current.last_updated }}{% endif %}</p>
     </div>
+
+    <!-- Section Navigation -->
+    <nav class="section-nav" aria-label="Forecast sections">
+        <a href="#current" class="nav-pill active" data-section="current">Current</a>
+        <a href="#hourly" class="nav-pill" data-section="hourly">Hourly</a>
+        <a href="#extended" class="nav-pill" data-section="extended">Extended</a>
+        <a href="#radar" class="nav-pill" data-section="radar">Radar</a>
+        <a href="#alerts" class="nav-pill" data-section="alerts">Alerts</a>
+    </nav>
 
     {% if favorites and favorites|length > 1 %}
     <section class="favorites-switch">
-        <span class="fav-label">Switch to:</span>
+        <span class="fav-label">Quick switch:</span>
         <div class="fav-pills">
             {% for fav in favorites %}
             {% if fav|lower != location_input|lower %}
@@ -30,49 +31,53 @@
     </section>
     {% endif %}
 
-    {% if weather.alerts %}
-    <section class="alerts-section alerts-prominent">
-        <h2>⚠️ Active Alerts</h2>
+    <!-- Alerts Section -->
+    <section id="alerts" class="dashboard-section alerts-section" data-section="alerts">
+        <h2 class="section-title">Active Alerts</h2>
+        {% if weather.alerts %}
         <div class="alerts-list">
             {% for a in weather.alerts %}
             <div class="alert-card severity-{{ a.severity }}" data-expanded="false">
-                <div class="alert-header">
-                    <h3 class="alert-title">{{ a.title }}</h3>
-                    <span class="severity-badge severity-{{ a.severity }}">{{ a.severity|upper }}</span>
-                </div>
-                {% if a.onset or a.expires %}
-                <p class="alert-timing">
-                    {% if a.onset %}From {{ a.onset }}{% endif %}
-                    {% if a.onset and a.expires %} • {% endif %}
-                    {% if a.expires %}Until {{ a.expires }}{% endif %}
-                </p>
-                {% endif %}
-                <div class="alert-summary-wrapper">
-                    <p class="alert-summary">{{ a.headline or a.summary }}</p>
-                    <div class="alert-details expandable">
+                <button type="button" class="alert-card-trigger" aria-expanded="false" aria-controls="alert-detail-{{ loop.index }}">
+                    <div class="alert-header">
+                        <span class="alert-icon">⚠️</span>
+                        <h3 class="alert-title">{{ a.title }}</h3>
+                        <span class="severity-badge severity-{{ a.severity }}">{{ a.severity|upper }}</span>
+                    </div>
+                    {% if a.onset or a.expires %}
+                    <p class="alert-timing">
+                        {% if a.onset %}{{ a.onset }}{% endif %}
+                        {% if a.onset and a.expires %} → {% endif %}
+                        {% if a.expires %}{{ a.expires }}{% endif %}
+                    </p>
+                    {% endif %}
+                    <p class="alert-summary-preview">{{ (a.headline or a.summary)|truncate(100) }}</p>
+                    <span class="expand-chevron" aria-hidden="true">▼</span>
+                </button>
+                <div id="alert-detail-{{ loop.index }}" class="alert-detail expandable" hidden>
+                    <div class="alert-detail-inner">
                         {% if a.summary %}
                         <p class="alert-description">{{ a.summary }}</p>
                         {% endif %}
                         {% if a.instruction %}
-                        <p class="alert-instruction"><strong>Instructions:</strong> {{ a.instruction }}</p>
+                        <p class="alert-instruction"><strong>What to do:</strong> {{ a.instruction }}</p>
                         {% endif %}
                     </div>
-                    {% if (a.summary and a.summary|length > 120) or a.instruction %}
-                    <button type="button" class="alert-expand-btn" aria-label="Show more">Show details</button>
-                    {% endif %}
                 </div>
             </div>
             {% endfor %}
         </div>
+        {% else %}
+        <div class="no-alerts-state">
+            <span class="no-alerts-icon">✓</span>
+            <p class="no-alerts-msg">No active alerts for this location</p>
+        </div>
+        {% endif %}
     </section>
-    {% else %}
-    <section class="alerts-section no-alerts">
-        <p class="no-alerts-msg">✓ No active alerts</p>
-    </section>
-    {% endif %}
 
-    <section class="current-section">
-        <h2>Current Conditions</h2>
+    <!-- Current Conditions -->
+    <section id="current" class="dashboard-section current-section" data-section="current">
+        <h2 class="section-title">Current Conditions</h2>
         <div class="current-card">
             <div class="current-main">
                 {% if weather.current.icon %}<span class="current-icon">{{ weather.current.icon }}</span>{% endif %}
@@ -83,86 +88,99 @@
                     {% endif %}
                 </div>
             </div>
-            <div class="current-details">
+            <div class="current-brief">
                 <p class="current-short">{{ weather.current.short_forecast }}</p>
                 <ul class="current-stats">
                     <li><strong>Wind:</strong> {{ weather.current.wind }}</li>
-                    <li><strong>Humidity:</strong> {{ weather.current.humidity }}</li>
-                    <li><strong>Precip chance:</strong> {{ weather.current.precipitation }}</li>
-                    {% if weather.current.last_updated %}
-                    <li class="current-updated">Updated {{ weather.current.last_updated }}</li>
-                    {% endif %}
+                    <li><strong>Precip:</strong> {{ weather.current.precipitation }}</li>
                 </ul>
+            </div>
+            <button type="button" class="current-expand-btn" aria-expanded="false" data-expand-target="current-details">More details</button>
+        </div>
+        <div id="current-details" class="details-expandable expandable" hidden>
+            <div class="details-grid">
+                <div class="detail-item"><span class="detail-label">Humidity</span><span class="detail-value">{{ weather.details.humidity }}</span></div>
+                <div class="detail-item"><span class="detail-label">Dew Point</span><span class="detail-value">{{ weather.details.dew_point }}</span></div>
+                <div class="detail-item"><span class="detail-label">Visibility</span><span class="detail-value">{{ weather.details.visibility }}</span></div>
+                <div class="detail-item"><span class="detail-label">Pressure</span><span class="detail-value">{{ weather.details.pressure }}</span></div>
+                {% if weather.current.wind_gust and weather.current.wind_gust != '—' %}
+                <div class="detail-item"><span class="detail-label">Wind Gust</span><span class="detail-value">{{ weather.current.wind_gust }}</span></div>
+                {% endif %}
+                <div class="detail-item"><span class="detail-label">Sunrise</span><span class="detail-value">{{ weather.details.sunrise }}</span></div>
+                <div class="detail-item"><span class="detail-label">Sunset</span><span class="detail-value">{{ weather.details.sunset }}</span></div>
             </div>
         </div>
     </section>
 
-    {% if weather.details %}
-    <section class="details-section">
-        <h2>Weather Details</h2>
-        <div class="details-grid">
-            <div class="detail-item"><span class="detail-label">Humidity</span><span class="detail-value">{{ weather.details.humidity }}</span></div>
-            <div class="detail-item"><span class="detail-label">Dew Point</span><span class="detail-value">{{ weather.details.dew_point }}</span></div>
-            <div class="detail-item"><span class="detail-label">Sunrise</span><span class="detail-value">{{ weather.details.sunrise }}</span></div>
-            <div class="detail-item"><span class="detail-label">Sunset</span><span class="detail-value">{{ weather.details.sunset }}</span></div>
-            <div class="detail-item"><span class="detail-label">Visibility</span><span class="detail-value">{{ weather.details.visibility }}</span></div>
-            <div class="detail-item"><span class="detail-label">Pressure</span><span class="detail-value">{{ weather.details.pressure }}</span></div>
-            {% if weather.details.uv_index and weather.details.uv_index != '—' %}
-            <div class="detail-item"><span class="detail-label">UV Index</span><span class="detail-value">{{ weather.details.uv_index }}</span></div>
-            {% endif %}
-        </div>
-    </section>
-    {% endif %}
-
     {% if weather.best_time %}
     <section class="best-time-section">
-        <h2>Best Time to Go Outside</h2>
         <p class="best-time-summary">{{ weather.best_time }}</p>
     </section>
     {% endif %}
 
+    <!-- Hourly Forecast -->
     {% if weather.hourly %}
-    <section class="hourly-section">
-        <h2>Hourly Forecast (Next 24 Hours)</h2>
+    <section id="hourly" class="dashboard-section hourly-section" data-section="hourly">
+        <h2 class="section-title">Next 24 Hours</h2>
         <div class="hourly-scroll">
             {% for h in weather.hourly %}
-            <div class="hourly-card">
-                {% if h.icon %}<span class="hourly-icon">{{ h.icon }}</span>{% endif %}
-                <span class="hourly-time">{{ h.time }}</span>
-                <span class="hourly-temp">{{ h.temp }}</span>
-                <span class="hourly-precip" title="Precipitation chance">💧 {{ h.precip }}</span>
-                <span class="hourly-wind">{{ h.wind }}</span>
-                <span class="hourly-desc">{{ h.short_forecast }}</span>
+            <div class="hourly-card" data-index="{{ loop.index0 }}" data-temp="{{ h.temp_value|default('') }}" data-precip="{{ h.precip_value|default('') }}"
+                 data-wind="{{ h.wind_speed_value|default('') }}" data-humidity="{{ h.humidity_value|default('') }}">
+                <button type="button" class="hourly-card-trigger">
+                    {% if h.icon %}<span class="hourly-icon">{{ h.icon }}</span>{% endif %}
+                    <span class="hourly-time">{{ h.time }}</span>
+                    <span class="hourly-temp">{{ h.temp }}</span>
+                    <span class="hourly-precip" title="Precip chance">💧 {{ h.precip }}</span>
+                    <span class="hourly-desc">{{ h.short_forecast }}</span>
+                </button>
+                <div class="hourly-expandable expandable" hidden>
+                    <div class="hourly-detail">
+                        <p class="hourly-wind"><strong>Wind:</strong> {{ h.wind }}</p>
+                        {% if h.detailed_forecast %}<p class="hourly-detailed">{{ h.detailed_forecast }}</p>{% endif %}
+                        <div class="hourly-chart-placeholder" data-index="{{ loop.index0 }}"></div>
+                    </div>
+                </div>
             </div>
             {% endfor %}
         </div>
     </section>
     {% endif %}
 
+    <!-- Extended / Daily Forecast -->
     {% if weather.daily %}
-    <section class="daily-section">
-        <h2>7-Day Forecast</h2>
+    <section id="extended" class="dashboard-section daily-section" data-section="extended">
+        <h2 class="section-title">7-Day Forecast</h2>
         <div class="daily-grid">
             {% for d in weather.daily %}
-            <div class="daily-card">
-                <span class="daily-icon">{{ d.icon }}</span>
-                <h3 class="daily-name">{{ d.name }}</h3>
-                <div class="daily-temps">
-                    <span class="daily-high">{{ d.high }}</span>
-                    <span class="daily-low">{{ d.low }}</span>
+            <div class="daily-card {% if 'Today' in d.name %}highlight-today{% endif %} {% if 'Tonight' in d.name or 'tonight' in d.name|lower %}highlight-tonight{% endif %} {% if 'Tomorrow' in d.name %}highlight-tomorrow{% endif %}"
+                 data-period-index="{{ d.period_index|default(loop.index0) }}">
+                <button type="button" class="daily-card-trigger">
+                    <span class="daily-icon">{{ d.icon }}</span>
+                    <h3 class="daily-name">{{ d.name }}</h3>
+                    <div class="daily-temps">
+                        <span class="daily-high">{{ d.high }}</span>
+                        <span class="daily-low">{{ d.low }}</span>
+                    </div>
+                    <p class="daily-summary">{{ d.summary }}</p>
+                    <span class="daily-precip">💧 {{ d.precip_chance }}</span>
+                </button>
+                <div class="daily-expandable expandable" hidden>
+                    <div class="daily-detail">
+                        {% if d.detailed_forecast %}<p class="daily-detailed">{{ d.detailed_forecast }}</p>{% endif %}
+                        <p class="daily-wind"><strong>Wind:</strong> {{ d.wind }}</p>
+                        <div class="daily-chart-placeholder" data-period-index="{{ d.period_index|default(loop.index0) }}"></div>
+                    </div>
                 </div>
-                <p class="daily-summary">{{ d.summary }}</p>
-                <span class="daily-precip">💧 {{ d.precip_chance }}</span>
             </div>
             {% endfor %}
         </div>
     </section>
     {% else %}
-    <section class="periods-section">
-        <h2>Extended Forecast</h2>
+    <section id="extended" class="dashboard-section periods-section" data-section="extended">
+        <h2 class="section-title">Extended Forecast</h2>
         <div class="periods-grid">
             {% for p in weather.periods %}
-            <div class="period-card {% if p.is_tonight %}highlight-tonight{% elif p.is_tomorrow %}highlight-tomorrow{% endif %}">
+            <div class="period-card {% if p.is_tonight %}highlight-tonight{% elif p.is_tomorrow %}highlight-tomorrow{% elif p.is_today %}highlight-today{% endif %}">
                 {% if p.icon %}<span class="period-icon">{{ p.icon }}</span>{% endif %}
                 <h3 class="period-name">{{ p.name }}</h3>
                 <span class="period-temp">{{ p.temp }}</span>
@@ -177,6 +195,15 @@
     </section>
     {% endif %}
 
+    <!-- Radar Section (built-in) -->
+    <section id="radar" class="dashboard-section radar-section" data-section="radar">
+        <h2 class="section-title">Radar &amp; Map</h2>
+        <p class="radar-hint">Centered on {{ weather.location }}</p>
+        <div class="radar-container">
+            <div id="radar-map" class="radar-map" data-lat="{{ weather.lat|default(39) }}" data-lon="{{ weather.lon|default(-98) }}"></div>
+        </div>
+    </section>
+
     <div class="dashboard-actions">
         <button type="button" class="btn btn-secondary add-favorite-btn" data-location="{{ location_input }}" {% if is_favorite %}disabled{% endif %}>
             {% if is_favorite %}★ In Favorites{% else %}★ Add to Favorites{% endif %}
@@ -185,22 +212,31 @@
         <button type="button" class="btn btn-outline remove-favorite-btn" data-location="{{ location_input }}">Remove from Favorites</button>
         {% endif %}
         <a href="{{ url_for('weather', location=location_input) }}" class="btn btn-secondary refresh-link">Refresh</a>
-        <span class="auto-refresh-note">Auto-refresh: 10 min</span>
+        <span class="auto-refresh-note">Data refreshes every 10 min</span>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        ClearerWeather.initDashboard({
+        var weatherData = {
             location: '{{ location_input|e }}',
+            lat: {{ weather.lat|default(39)|tojson }},
+            lon: {{ weather.lon|default(-98)|tojson }},
+            chartHourly: {{ chart_hourly|tojson }},
             refreshInterval: 600000
-        });
+        };
+        ClearerWeather.initDashboard(weatherData);
         ClearerWeather.initAutocomplete('header-search-input', 'search-suggestions');
         ClearerWeather.initUseLocation('.site-header .use-location-btn');
-        ClearerWeather.initAlertExpand();
+        ClearerWeather.initRadar(weatherData.lat, weatherData.lon);
+        ClearerWeather.initSectionNav();
+        ClearerWeather.initExpandableCards();
+        ClearerWeather.initCharts(weatherData.chartHourly);
         ClearerWeather.initRemoveFavorite();
     });
 </script>

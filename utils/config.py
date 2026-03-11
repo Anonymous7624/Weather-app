@@ -47,6 +47,16 @@ class Config:
     def default_location(self):
         return os.environ.get("DEFAULT_LOCATION") or self._data.get("default_location", "")
 
+    def get_last_location(self):
+        """Last location selected by user (persists across sessions)."""
+        return self._data.get("last_location", "") or self.default_location
+
+    def set_last_location(self, location):
+        """Save last selected location."""
+        if location and isinstance(location, str) and location.strip():
+            self._data["last_location"] = location.strip()
+            _save_config(self._data)
+
     def get_recent_searches(self):
         return self._data.get("recent_searches", [])[:MAX_RECENT]
 
