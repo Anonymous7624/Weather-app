@@ -1,6 +1,6 @@
-# Clearer Weather
+# Clearcast
 
-A premium-feeling, lightweight weather dashboard for Raspberry Pi. Uses the official [National Weather Service API](https://api.weather.gov) with a clean Flask + Jinja + vanilla JS stack. No React, no heavy frontend—just fast, readable weather.
+An intelligent, lightweight weather dashboard for Raspberry Pi. Uses the official [National Weather Service API](https://api.weather.gov) with a clean Flask + Jinja + vanilla JS stack. No React, no heavy frontend — just fast, readable weather.
 
 ## Features
 
@@ -14,6 +14,7 @@ A premium-feeling, lightweight weather dashboard for Raspberry Pi. Uses the offi
 - **Dark/light mode** – Theme toggle with system preference detection
 - **Mobile & desktop** – Responsive layout; radar usable on mobile
 - **Raspberry Pi ready** – Minimal dependencies, 10-minute cache, runs on Pi 4 (4GB)
+- **Static homepage** – Polished product landing page suitable for GitHub Pages
 
 ## Quick Start (Raspberry Pi)
 
@@ -21,8 +22,8 @@ A premium-feeling, lightweight weather dashboard for Raspberry Pi. Uses the offi
 
 ```bash
 cd ~
-git clone https://github.com/YOUR_USERNAME/clearer-weather.git
-cd clearer-weather
+git clone https://github.com/YOUR_USERNAME/clearcast.git
+cd clearcast
 ```
 
 ### 2. Virtual environment
@@ -75,39 +76,55 @@ The radar view loads inside the app:
 
 On first opening the Radar section, the map centers on your selected location. Changing location updates the radar automatically.
 
+## Static Homepage
+
+The `docs/` folder contains a static product landing page designed for GitHub Pages (or any static hosting). It shares the same design language, color palette, and typography as the weather app.
+
+**Structure:**
+```
+docs/
+├── index.html          # Landing page
+├── css/
+│   └── homepage.css    # Homepage styles (same theme variables)
+└── js/
+    └── homepage.js     # Scroll animations, theme toggle
+```
+
+**Deployment:** Configure GitHub Pages to serve from the `docs/` folder on your main branch. The homepage lives on the root domain; the Flask weather app runs on the `weather` subdomain.
+
 ## Systemd Service
 
 1. Copy the service file:
 
 ```bash
-sudo cp clearer-weather.service /etc/systemd/system/
+sudo cp clearer-weather.service /etc/systemd/system/clearcast.service
 ```
 
 2. Edit if needed (paths, user, default location):
 
 ```bash
-sudo nano /etc/systemd/system/clearer-weather.service
+sudo nano /etc/systemd/system/clearcast.service
 ```
 
 3. Enable and start:
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable clearer-weather
-sudo systemctl start clearer-weather
-sudo systemctl status clearer-weather
+sudo systemctl enable clearcast
+sudo systemctl start clearcast
+sudo systemctl status clearcast
 ```
 
 4. Logs:
 
 ```bash
-journalctl -u clearer-weather -f
+journalctl -u clearcast -f
 ```
 
 ## Project Structure
 
 ```
-clearer-weather/
+clearcast/
 ├── app.py                    # Flask app, routes
 ├── requirements.txt
 ├── README.md
@@ -132,6 +149,12 @@ clearer-weather/
 │   ├── normalize.py          # Data normalization
 │   ├── cache.py              # In-memory cache
 │   └── sun.py                # Sunrise/sunset
+├── docs/                     # Static homepage (GitHub Pages)
+│   ├── index.html
+│   ├── css/
+│   │   └── homepage.css
+│   └── js/
+│       └── homepage.js
 └── instance/                 # Runtime: config.json
 ```
 
@@ -159,8 +182,8 @@ clearer-weather/
 
 ```bash
 cd ~
-git clone https://github.com/YOUR_USERNAME/clearer-weather.git
-cd clearer-weather
+git clone https://github.com/YOUR_USERNAME/clearcast.git
+cd clearcast
 
 python3 -m venv venv
 source venv/bin/activate

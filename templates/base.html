@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Clearer Weather{% endblock %}</title>
+    <title>{% block title %}Clearcast{% endblock %}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
@@ -12,7 +12,7 @@
 </head>
 <body class="theme-dark">
     <header class="site-header">
-        <a href="{{ url_for('index') }}" class="logo">Clearer Weather</a>
+        <a href="{{ url_for('index') }}" class="logo">Clearcast</a>
         <form class="search-form" action="{{ url_for('weather') }}" method="get" role="search">
             <div class="search-wrap">
                 <input type="text" name="location" placeholder="ZIP, city/state, or lat,lon"
@@ -37,7 +37,7 @@
         {% block content %}{% endblock %}
     </main>
     <footer class="site-footer">
-        <p>Data from <a href="https://www.weather.gov" target="_blank" rel="noopener">National Weather Service</a> • Clearer Weather on Raspberry Pi</p>
+        <p>Weather data from <a href="https://www.weather.gov" target="_blank" rel="noopener">National Weather Service</a>&ensp;·&ensp;Powered by <strong>Clearcast</strong></p>
     </footer>
     {% block scripts %}{% endblock %}
 </body>

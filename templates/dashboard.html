@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ weather.location }} – Clearer Weather{% endblock %}
+{% block title %}{{ weather.location }} – Clearcast{% endblock %}
 
 {% block content %}
 <div class="dashboard" data-location="{{ location_input }}" data-lat="{{ weather.lat|default('') }}" data-lon="{{ weather.lon|default('') }}">
@@ -230,14 +230,14 @@
             chartHourly: {{ chart_hourly|tojson }},
             refreshInterval: 600000
         };
-        ClearerWeather.initDashboard(weatherData);
-        ClearerWeather.initAutocomplete('header-search-input', 'search-suggestions');
-        ClearerWeather.initUseLocation('.site-header .use-location-btn');
-        ClearerWeather.initRadar(weatherData.lat, weatherData.lon);
-        ClearerWeather.initSectionNav();
-        ClearerWeather.initExpandableCards();
-        ClearerWeather.initCharts(weatherData.chartHourly);
-        ClearerWeather.initRemoveFavorite();
+        Clearcast.initDashboard(weatherData);
+        Clearcast.initAutocomplete('header-search-input', 'search-suggestions');
+        Clearcast.initUseLocation('.site-header .use-location-btn');
+        Clearcast.initRadar(weatherData.lat, weatherData.lon);
+        Clearcast.initSectionNav();
+        Clearcast.initExpandableCards();
+        Clearcast.initCharts(weatherData.chartHourly);
+        Clearcast.initRemoveFavorite();
     });
 </script>
 {% endblock %}

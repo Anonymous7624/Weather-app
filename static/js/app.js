@@ -1,9 +1,9 @@
 /**
- * Clearer Weather - Vanilla JS
+ * Clearcast - Vanilla JS
  * Theme, autocomplete, geolocation, radar, charts, progressive disclosure
  */
 
-const ClearerWeather = (function () {
+const Clearcast = (function () {
     const loadingId = 'loading-overlay';
     const DEBOUNCE_MS = 300;
 
@@ -21,7 +21,7 @@ const ClearerWeather = (function () {
         const btn = document.querySelector('.theme-toggle');
         if (!btn) return;
 
-        const stored = localStorage.getItem('clearer-weather-theme');
+        const stored = localStorage.getItem('clearcast-theme') || localStorage.getItem('clearer-weather-theme');
         if (stored === 'light' || (stored === null && window.matchMedia('(prefers-color-scheme: light)').matches)) {
             document.body.classList.remove('theme-dark');
             document.body.classList.add('theme-light');
@@ -35,11 +35,11 @@ const ClearerWeather = (function () {
             if (isLight) {
                 document.body.classList.remove('theme-light');
                 document.body.classList.add('theme-dark');
-                localStorage.setItem('clearer-weather-theme', 'dark');
+                localStorage.setItem('clearcast-theme', 'dark');
             } else {
                 document.body.classList.remove('theme-dark');
                 document.body.classList.add('theme-light');
-                localStorage.setItem('clearer-weather-theme', 'light');
+                localStorage.setItem('clearcast-theme', 'light');
             }
         });
     }
@@ -411,7 +411,7 @@ const ClearerWeather = (function () {
                 if (expanded) {
                     const placeholder = content.querySelector('.hourly-chart-placeholder');
                     if (placeholder && placeholder.dataset.index !== undefined) {
-                        ClearerWeather.renderHourlyChart(placeholder, parseInt(placeholder.dataset.index, 10));
+                        Clearcast.renderHourlyChart(placeholder, parseInt(placeholder.dataset.index, 10));
                     }
                 }
             });
@@ -427,7 +427,7 @@ const ClearerWeather = (function () {
                 if (expanded) {
                     const placeholder = content.querySelector('.daily-chart-placeholder');
                     if (placeholder && placeholder.dataset.periodIndex !== undefined) {
-                        ClearerWeather.renderDailyChart(placeholder, parseInt(placeholder.dataset.periodIndex, 10));
+                        Clearcast.renderDailyChart(placeholder, parseInt(placeholder.dataset.periodIndex, 10));
                     }
                 }
             });
@@ -602,4 +602,4 @@ const ClearerWeather = (function () {
     };
 })();
 
-document.addEventListener('DOMContentLoaded', ClearerWeather.init);
+document.addEventListener('DOMContentLoaded', Clearcast.init);

@@ -1,5 +1,5 @@
 """
-Clearer Weather - A lightweight weather dashboard for Raspberry Pi.
+Clearcast - A lightweight weather dashboard for Raspberry Pi.
 Uses the official NWS API (api.weather.gov) with a Flask backend.
 """
 
