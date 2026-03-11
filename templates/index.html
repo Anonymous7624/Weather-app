@@ -12,7 +12,7 @@
     <form class="landing-search" action="{{ url_for('weather') }}" method="get">
         <div class="search-wrap landing-search-wrap">
             <input type="text" name="location" placeholder="Enter ZIP code, city/state, or coordinates"
-                   value="{{ default_location }}" autocomplete="off" class="landing-input" required
+                   value="{{ location_prefill|default(default_location, true) }}" autocomplete="off" class="landing-input" required
                    id="landing-search-input" aria-label="Search location" aria-autocomplete="list" aria-controls="landing-suggestions" aria-expanded="false">
             <div id="landing-suggestions" class="search-suggestions hidden" role="listbox"></div>
         </div>

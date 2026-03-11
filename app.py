@@ -25,9 +25,13 @@ app.config["MAX_CONTENT_LENGTH"] = 1024  # Limit request size
 def index():
     """Landing page with search form."""
     config = get_config()
+    # Use last selected location if available, else default
+    location_prefill = config.get_last_location() or config.default_location
     return render_template(
         "index.html",
         default_location=config.default_location,
+        location_prefill=location_prefill,
+        location_input=location_prefill,  # For header search on base
         recent_searches=config.get_recent_searches(),
         favorites=config.get_favorites(),
     )
@@ -40,9 +44,10 @@ def weather():
 
     if not location_input:
         config = get_config()
-        default = config.default_location
-        if default:
-            return redirect(url_for("weather", location=default))
+        # Prefer last location, then default from env
+        location = config.get_last_location() or config.default_location
+        if location:
+            return redirect(url_for("weather", location=location))
         return redirect(url_for("index"))
 
     # Try cache first (reduces API calls)
@@ -51,6 +56,7 @@ def weather():
     if cached:
         config = get_config()
         config.add_recent_search(location_input)
+        config.set_last_location(location_input)
         favs_lower = [f.strip().lower() for f in config.get_favorites()]
         is_favorite = location_input.strip().lower() in favs_lower
         return render_template(
@@ -60,6 +66,7 @@ def weather():
             config=config,
             is_favorite=is_favorite,
             favorites=config.get_favorites(),
+            chart_hourly=cached.get("chart_hourly", []),
         )
 
     # Resolve location to lat/lon
@@ -91,6 +98,7 @@ def weather():
 
     config = get_config()
     config.add_recent_search(location_input)
+    config.set_last_location(location_input)
 
     favs_lower = [f.strip().lower() for f in config.get_favorites()]
     is_favorite = location_input.strip().lower() in favs_lower
@@ -101,6 +109,7 @@ def weather():
         config=config,
         is_favorite=is_favorite,
         favorites=config.get_favorites(),
+        chart_hourly=weather_data.get("chart_hourly", []),
     )
 
 

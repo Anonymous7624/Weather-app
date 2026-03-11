@@ -1,19 +1,23 @@
 # Clearer Weather
 
-A lightweight, production-ready weather dashboard for Raspberry Pi. Uses the official [National Weather Service API](https://api.weather.gov) to present forecast data in a clean, readable format.
+A premium-feeling, lightweight weather dashboard for Raspberry Pi. Uses the official [National Weather Service API](https://api.weather.gov) with a clean Flask + Jinja + vanilla JS stack. No React, no heavy frontend—just fast, readable weather.
 
 ## Features
 
-- **Clean UI** – Card-based layout, modern typography, dark/light mode
-- **NWS API** – Official api.weather.gov (no scraping)
-- **Multiple input formats** – ZIP code, city/state, or latitude,longitude
-- **Sections** – Current conditions, hourly forecast, extended forecast, active alerts
-- **Lightweight** – Minimal dependencies, suitable for Raspberry Pi 4 (4GB)
-- **Caching** – 10-minute cache to reduce API calls
+- **Smart location** – Autocomplete search (ZIP, city/state, lat/lon), keyboard navigation, "Use My Location" via geolocation
+- **Persistent location** – Selected location persists across sessions; favorites and recent searches
+- **Built-in radar** – Map-based radar view inside the app, centered on your location (Leaflet + OpenStreetMap + NWS radar overlay)
+- **Progressive detail** – Clean default view; expand days, hours, and alerts for deeper data
+- **Advanced data on demand** – Humidity, dew point, pressure, visibility, wind gusts, sunrise/sunset, precipitation trends
+- **Lightweight charts** – Temperature, precipitation, wind, and humidity trends when you drill down (Chart.js)
+- **Alerts** – Clear severity, timing, expandable full detail; calm "No active alerts" state
+- **Dark/light mode** – Theme toggle with system preference detection
+- **Mobile & desktop** – Responsive layout; radar usable on mobile
+- **Raspberry Pi ready** – Minimal dependencies, 10-minute cache, runs on Pi 4 (4GB)
 
 ## Quick Start (Raspberry Pi)
 
-### 1. Clone from GitHub
+### 1. Clone and prepare
 
 ```bash
 cd ~
@@ -21,14 +25,14 @@ git clone https://github.com/YOUR_USERNAME/clearer-weather.git
 cd clearer-weather
 ```
 
-### 2. Create virtual environment
+### 2. Virtual environment
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 ```
 
-### 3. Install requirements
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
@@ -38,32 +42,40 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
-# Edit .env to set DEFAULT_LOCATION, etc.
+# Edit .env: DEFAULT_LOCATION=Boston, MA
 ```
 
-### 5. Run locally
+### 5. Run
 
-**Development (Flask built-in server):**
-
+**Development:**
 ```bash
-python app.py
+python3 app.py
 ```
 
-**Production (bind to all interfaces on port 5050):**
-
+**Production (bind 0.0.0.0:5050):**
 ```bash
 gunicorn -w 1 -b 0.0.0.0:5050 app:app
 ```
 
-Or with environment variable:
-
+Or with Flask directly:
 ```bash
-PORT=5050 python app.py
+PORT=5050 python3 app.py
 ```
 
 Access at `http://<pi-ip>:5050`
 
-## Systemd Service (run continuously)
+## Built-in Radar
+
+The radar view loads inside the app:
+
+- **Leaflet** and **Chart.js** are loaded from CDNs (unpkg, jsDelivr)
+- **OpenStreetMap** provides the base map
+- **NWS radar** overlay (via IEM NEXRAD WMS) shows precipitation
+- No extra setup; the radar works as long as the Pi has internet
+
+On first opening the Radar section, the map centers on your selected location. Changing location updates the radar automatically.
+
+## Systemd Service
 
 1. Copy the service file:
 
@@ -71,13 +83,11 @@ Access at `http://<pi-ip>:5050`
 sudo cp clearer-weather.service /etc/systemd/system/
 ```
 
-2. Edit the service file to match your paths (e.g. if installed elsewhere):
+2. Edit if needed (paths, user, default location):
 
 ```bash
 sudo nano /etc/systemd/system/clearer-weather.service
 ```
-
-Adjust `WorkingDirectory`, `ExecStart`, and `Environment` as needed.
 
 3. Enable and start:
 
@@ -88,32 +98,22 @@ sudo systemctl start clearer-weather
 sudo systemctl status clearer-weather
 ```
 
-4. View logs:
+4. Logs:
 
 ```bash
 journalctl -u clearer-weather -f
 ```
 
-## Cloudflare Tunnel / Reverse Proxy
-
-To expose the app through a tunnel or reverse proxy:
-
-- **Cloudflare Tunnel**: Run `cloudflared tunnel` and point it to `http://localhost:5050`
-- **Nginx**: Proxy `/` to `http://127.0.0.1:5050`
-- **Caddy**: `reverse_proxy localhost:5050`
-
-The app has no special headers requirements; standard reverse proxy config works.
-
 ## Project Structure
 
 ```
 clearer-weather/
-├── app.py                 # Flask application
+├── app.py                    # Flask app, routes
 ├── requirements.txt
 ├── README.md
 ├── .env.example
 ├── .gitignore
-├── clearer-weather.service
+├── clearer-weather.service    # Systemd unit
 ├── templates/
 │   ├── base.html
 │   ├── index.html
@@ -126,12 +126,13 @@ clearer-weather/
 │       └── app.js
 ├── utils/
 │   ├── __init__.py
-│   ├── config.py         # Default location, favorites, recent
-│   ├── geocode.py        # Census + Nominatim geocoding
-│   ├── nws.py            # NWS API client
-│   ├── normalize.py      # Data normalization
-│   └── cache.py          # In-memory cache
-└── instance/             # Created at runtime (config.json)
+│   ├── config.py             # Last location, favorites, recent
+│   ├── geocode.py            # Census + Nominatim
+│   ├── nws.py                # NWS API client
+│   ├── normalize.py          # Data normalization
+│   ├── cache.py              # In-memory cache
+│   └── sun.py                # Sunrise/sunset
+└── instance/                 # Runtime: config.json
 ```
 
 ## Environment Variables
@@ -140,46 +141,40 @@ clearer-weather/
 |----------|---------|-------------|
 | `DEFAULT_LOCATION` | (empty) | Default location on first visit |
 | `PORT` | 5050 | Port to bind |
-| `CACHE_TTL_SECONDS` | 600 | Cache duration (10 min) |
-| `FLASK_DEBUG` | 0 | Set to 1 for debug mode |
+| `CACHE_TTL_SECONDS` | 600 | Cache TTL (10 min) |
+| `FLASK_DEBUG` | 0 | Set to 1 for debug |
 | `SECRET_KEY` | (dev default) | Session secret |
 
 ## Tech Stack
 
 - Python 3.9+
-- Flask
-- Jinja2
-- Vanilla HTML/CSS/JS
+- Flask, Jinja2
+- Vanilla HTML/CSS/JS (no React)
 - NWS API (api.weather.gov)
-- Nominatim (OpenStreetMap) for geocoding
+- Leaflet + OpenStreetMap (CDN)
+- Chart.js (CDN)
+- Census + Nominatim geocoding
 
-## Exact Raspberry Pi Run Commands
+## Raspberry Pi Run Commands (Summary)
 
 ```bash
-# Clone
 cd ~
 git clone https://github.com/YOUR_USERNAME/clearer-weather.git
 cd clearer-weather
 
-# Virtual environment
 python3 -m venv venv
 source venv/bin/activate
 
-# Install
 pip install -r requirements.txt
 
-# Optional: configure default location
 cp .env.example .env
-# Edit .env: DEFAULT_LOCATION=Boston, MA
+# Optional: DEFAULT_LOCATION=Boston, MA
 
-# Run (development)
+# Development
 python3 app.py
 
-# Run (production, bind to 0.0.0.0 on port 5050)
+# Production (0.0.0.0:5050)
 gunicorn -w 1 -b 0.0.0.0:5050 app:app
-
-# Or with Flask directly on port 5050
-PORT=5050 python3 app.py
 ```
 
 Access at `http://<your-pi-ip>:5050`

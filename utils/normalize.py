@@ -201,6 +201,18 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
                 current["wind_direction"] = dirs[idx]
             except (TypeError, ValueError):
                 pass
+        # Wind gust
+        gust = _obs_value(obs_props, "windGust")
+        if gust is not None:
+            try:
+                v = float(gust)
+                if "m_s" in str(wind_unit) or "ms" in str(wind_unit).lower():
+                    v = v * 2.237
+                current["wind_gust"] = f"{int(round(v))} mph"
+            except (TypeError, ValueError):
+                current["wind_gust"] = "—"
+        else:
+            current["wind_gust"] = "—"
         if current["wind_speed"] != "—" or current["wind_direction"] != "—":
             parts = []
             if current["wind_direction"] != "—":
@@ -260,6 +272,7 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
         current["dew_point"] = "—"
         current["visibility"] = "—"
         current["pressure"] = "—"
+        current["wind_gust"] = "—"
 
     # --- Periods (extended forecast) ---
     periods = []
@@ -286,18 +299,30 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
             is_tonight = "tonight" in name.lower()
             is_tomorrow = "tomorrow" in name.lower()
 
+            precip_val_num = precip_val if isinstance(precip_val, (int, float)) else None
+            wind_speed_raw = p.get("windSpeed")
+            wind_speed_val = _extract_number(wind_speed_raw)
+            if wind_speed_val is not None and isinstance(wind_speed_raw, dict):
+                if "m_s" in str(wind_speed_raw.get("unitCode", "")):
+                    wind_speed_val = wind_speed_val * 2.237
+
             periods.append({
                 "name": name,
                 "temp": temp,
+                "temp_value": _c_to_f(_extract_number(p.get("temperature"))),
                 "wind": wind,
+                "wind_speed_value": int(wind_speed_val) if wind_speed_val is not None else None,
                 "short_forecast": short,
                 "detailed_forecast": detailed,
                 "start_time": start,
                 "precip_chance": precip,
+                "precip_value": int(precip_val_num) if precip_val_num is not None else None,
                 "is_today": is_today,
                 "is_tonight": is_tonight,
                 "is_tomorrow": is_tomorrow,
                 "icon": weather_icon(short),
+                "wind_direction": p.get("windDirection"),
+                "index": len(periods),
             })
 
             # Use first period for current if we don't have observation data
@@ -316,8 +341,8 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
     # --- Hourly ---
     hourly_cards = []
     if hourly and "properties" in hourly:
-        hps = hourly.get("properties", {}).get("periods", [])[:24]  # Next 24 hours
-        for hp in hps:
+        hps = hourly.get("properties", {}).get("periods", [])[:48]  # 48 hours for charts
+        for idx, hp in enumerate(hps[:24]):  # 24 for display
             temp = _temp(hp.get("temperature"))
             wind = _wind_string(hp.get("windDirection"), hp.get("windSpeed"))
             short = _safe(hp.get("shortForecast", ""))
@@ -329,13 +354,51 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
             precip_val = precip.get("value") if isinstance(precip, dict) else None
             precip_str = f"{precip_val}%" if precip_val is not None else "—"
 
+            temp_val = _extract_number(hp.get("temperature"))
+            temp_f = _c_to_f(temp_val) if temp_val is not None else None
+            wind_speed_val = _extract_number(hp.get("windSpeed"))
+            if wind_speed_val is not None:
+                wind_unit = hp.get("windSpeed")
+                if isinstance(wind_unit, dict) and "m_s" in str(wind_unit.get("unitCode", "")):
+                    wind_speed_val = wind_speed_val * 2.237
+            humidity_val = _extract_number(hp.get("relativeHumidity"))
+
             hourly_cards.append({
                 "time": time_str,
                 "temp": temp,
+                "temp_value": temp_f,
                 "wind": wind,
+                "wind_speed_value": int(wind_speed_val) if wind_speed_val is not None else None,
                 "short_forecast": short,
                 "precip": precip_str,
+                "precip_value": int(precip_val) if precip_val is not None else None,
+                "humidity_value": int(humidity_val) if humidity_val is not None else None,
                 "icon": weather_icon(short),
+                "detailed_forecast": _safe(hp.get("detailedForecast", "")),
+                "start_time": start,
+            })
+
+    # Chart data: extended hourly for 48h (for trend charts when expanded)
+    chart_hourly = []
+    if hourly and "properties" in hourly:
+        hps = hourly.get("properties", {}).get("periods", [])[:48]
+        for hp in hps:
+            temp_val = _extract_number(hp.get("temperature"))
+            temp_f = _c_to_f(temp_val) if temp_val is not None else None
+            precip = hp.get("probabilityOfPrecipitation", {})
+            precip_val = precip.get("value") if isinstance(precip, dict) else None
+            wind_speed_val = _extract_number(hp.get("windSpeed"))
+            if wind_speed_val is not None:
+                wu = hp.get("windSpeed")
+                if isinstance(wu, dict) and "m_s" in str(wu.get("unitCode", "")):
+                    wind_speed_val = wind_speed_val * 2.237
+            humidity_val = _extract_number(hp.get("relativeHumidity"))
+            chart_hourly.append({
+                "time": _short_time(hp.get("startTime", "")),
+                "temp": temp_f,
+                "precip": int(precip_val) if precip_val is not None else None,
+                "wind": int(wind_speed_val) if wind_speed_val is not None else None,
+                "humidity": int(humidity_val) if humidity_val is not None else None,
             })
 
     current["icon"] = weather_icon(current.get("short_forecast", ""))
@@ -378,6 +441,10 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
     # --- Best time to go outside ---
     best_time = _compute_best_time(periods, hourly_cards)
 
+    # Add wind_gust to current if missing
+    if "wind_gust" not in current:
+        current["wind_gust"] = "—"
+
     return {
         "location": display_name,
         "lat": lat,
@@ -387,6 +454,7 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
         "periods": periods,
         "daily": daily,
         "hourly": hourly_cards,
+        "chart_hourly": chart_hourly,
         "details": details,
         "best_time": best_time,
     }
@@ -432,6 +500,9 @@ def _build_daily_forecast(periods):
             "summary": summary,
             "precip_chance": precip,
             "icon": icon,
+            "detailed_forecast": p.get("detailed_forecast", ""),
+            "wind": p.get("wind", "—"),
+            "period_index": i,
         })
     return daily
 

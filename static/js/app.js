@@ -1,6 +1,6 @@
 /**
  * Clearer Weather - Vanilla JS
- * Theme toggle, autocomplete, geolocation, loading state, favorites, auto-refresh
+ * Theme, autocomplete, geolocation, radar, charts, progressive disclosure
  */
 
 const ClearerWeather = (function () {
@@ -84,7 +84,7 @@ const ClearerWeather = (function () {
                 const s = suggestions[idx];
                 input.value = s.display_name;
                 hideSuggestions();
-                var form = input.closest('form');
+                const form = input.closest('form');
                 if (form) {
                     showLoading();
                     form.submit();
@@ -108,7 +108,7 @@ const ClearerWeather = (function () {
                         return;
                     }
                     suggestions.forEach(function (s, i) {
-                        var btn = document.createElement('button');
+                        const btn = document.createElement('button');
                         btn.type = 'button';
                         btn.className = 'suggestion-item';
                         btn.role = 'option';
@@ -129,7 +129,7 @@ const ClearerWeather = (function () {
 
         input.addEventListener('input', function () {
             clearTimeout(debounceTimer);
-            var q = input.value.trim();
+            const q = input.value.trim();
             debounceTimer = setTimeout(function () {
                 fetchSuggestions(q);
             }, DEBOUNCE_MS);
@@ -149,14 +149,18 @@ const ClearerWeather = (function () {
                 e.preventDefault();
                 selectSuggestion(selectedIndex);
             } else if (e.key === 'Escape') {
+                e.preventDefault();
                 hideSuggestions();
             }
         });
 
         function updateHighlight() {
-            var items = dropdown.querySelectorAll('.suggestion-item');
+            const items = dropdown.querySelectorAll('.suggestion-item');
             items.forEach(function (item, i) {
                 item.setAttribute('aria-selected', i === selectedIndex);
+                if (i === selectedIndex) {
+                    item.scrollIntoView({ block: 'nearest' });
+                }
             });
         }
 
@@ -179,17 +183,18 @@ const ClearerWeather = (function () {
                     return;
                 }
                 btn.disabled = true;
+                const origText = btn.textContent;
                 btn.textContent = 'Locating…';
                 navigator.geolocation.getCurrentPosition(
                     function (pos) {
-                        var lat = pos.coords.latitude.toFixed(4);
-                        var lon = pos.coords.longitude.toFixed(4);
+                        const lat = pos.coords.latitude.toFixed(4);
+                        const lon = pos.coords.longitude.toFixed(4);
                         showLoading();
-                        window.location.href = '/weather?location=' + lat + ',' + lon;
+                        window.location.href = '/weather?location=' + encodeURIComponent(lat + ',' + lon);
                     },
                     function () {
                         btn.disabled = false;
-                        btn.textContent = '📍 Use My Location';
+                        btn.textContent = origText;
                         alert('Could not get your location. Please check permissions or try again.');
                     }
                 );
@@ -213,7 +218,7 @@ const ClearerWeather = (function () {
                         if (data.ok) {
                             btn.textContent = '★ In Favorites';
                             btn.disabled = true;
-                            var removeBtn = document.querySelector('.remove-favorite-btn');
+                            const removeBtn = document.querySelector('.remove-favorite-btn');
                             if (removeBtn) removeBtn.style.display = '';
                         }
                     })
@@ -236,7 +241,7 @@ const ClearerWeather = (function () {
                     .then(function (r) { return r.json(); })
                     .then(function (data) {
                         if (data.ok) {
-                            var addBtn = document.querySelector('.add-favorite-btn');
+                            const addBtn = document.querySelector('.add-favorite-btn');
                             if (addBtn) {
                                 addBtn.textContent = '★ Add to Favorites';
                                 addBtn.disabled = false;
@@ -249,16 +254,306 @@ const ClearerWeather = (function () {
         });
     }
 
-    function initAlertExpand() {
-        document.querySelectorAll('.alert-expand-btn').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var card = btn.closest('.alert-card');
-                if (card) {
-                    var expanded = card.getAttribute('data-expanded') === 'true';
-                    card.setAttribute('data-expanded', !expanded);
-                    btn.textContent = expanded ? 'Show details' : 'Hide details';
+    function initRadar(lat, lon) {
+        const mapEl = document.getElementById('radar-map');
+        if (!mapEl || typeof L === 'undefined') return;
+
+        lat = parseFloat(lat) || 39;
+        lon = parseFloat(lon) || -98;
+
+        const map = L.map('radar-map', {
+            center: [lat, lon],
+            zoom: 8,
+            zoomControl: true,
+        });
+        L.control.zoom({ position: 'topright' }).addTo(map);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap',
+            maxZoom: 19,
+        }).addTo(map);
+
+        try {
+            const radarLayer = L.tileLayer.wms('https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0q.cgi', {
+                layers: 'nexrad-n0q-900913',
+                format: 'image/png',
+                transparent: true,
+                opacity: 0.6,
+                attribution: 'Radar: NOAA/IEM',
+            });
+            radarLayer.addTo(map);
+        } catch (err) {
+            try {
+                const fallback = L.tileLayer.wms('https://mesonet.agron.iastate.edu/cgi-bin/wms/nexrad/n0r.cgi', {
+                    layers: 'nexrad-n0r-900913',
+                    format: 'image/png',
+                    transparent: true,
+                    opacity: 0.6,
+                    attribution: 'Radar: NOAA/IEM',
+                });
+                fallback.addTo(map);
+            } catch (e) {
+                console.warn('Radar overlay unavailable, map only');
+            }
+        }
+
+        L.marker([lat, lon]).addTo(map)
+            .bindPopup('Your location')
+            .openPopup();
+
+        mapEl._leaflet_map = map;
+    }
+
+    function initSectionNav() {
+        const pills = document.querySelectorAll('.nav-pill');
+        const sections = document.querySelectorAll('.dashboard-section[data-section]');
+        if (!pills.length || !sections.length) return;
+
+        function setActive(sectionId) {
+            pills.forEach(function (p) {
+                if (p.getAttribute('data-section') === sectionId) {
+                    p.classList.add('active');
+                } else {
+                    p.classList.remove('active');
                 }
             });
+        }
+
+        pills.forEach(function (pill) {
+            pill.addEventListener('click', function (e) {
+                e.preventDefault();
+                const sectionId = pill.getAttribute('data-section');
+                const target = document.getElementById(sectionId) || document.querySelector('[data-section="' + sectionId + '"]');
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    setActive(sectionId);
+                    if (sectionId === 'radar') {
+                        setTimeout(function () {
+                            const mapEl = document.getElementById('radar-map');
+                            if (mapEl && mapEl._leaflet_map) {
+                                mapEl._leaflet_map.invalidateSize();
+                            }
+                        }, 300);
+                    }
+                }
+            });
+        });
+
+        const observer = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+                if (entry.isIntersecting) {
+                    const id = entry.target.getAttribute('data-section') || entry.target.id;
+                    if (id) setActive(id);
+                }
+            });
+        }, { rootMargin: '-100px 0px -60% 0px', threshold: 0 });
+
+        sections.forEach(function (s) {
+            observer.observe(s);
+        });
+    }
+
+    function initExpandableCards() {
+        function toggleExpand(trigger, content, isExpanded) {
+            if (isExpanded) {
+                content.hidden = false;
+                if (trigger) {
+                    trigger.setAttribute('aria-expanded', 'true');
+                    if (trigger.classList.contains('current-expand-btn')) {
+                        trigger.textContent = 'Less details';
+                    }
+                    if (trigger.classList.contains('alert-card-trigger')) {
+                        const chev = trigger.querySelector('.expand-chevron');
+                        if (chev) chev.textContent = '▲';
+                    }
+                }
+            } else {
+                content.hidden = true;
+                if (trigger) {
+                    trigger.setAttribute('aria-expanded', 'false');
+                    if (trigger.classList.contains('current-expand-btn')) {
+                        trigger.textContent = 'More details';
+                    }
+                    if (trigger.classList.contains('alert-card-trigger')) {
+                        const chev = trigger.querySelector('.expand-chevron');
+                        if (chev) chev.textContent = '▼';
+                    }
+                }
+            }
+        }
+
+        document.querySelectorAll('.current-expand-btn').forEach(function (btn) {
+            const targetId = btn.getAttribute('data-expand-target');
+            const content = document.getElementById(targetId);
+            if (!content) return;
+            btn.addEventListener('click', function () {
+                const expanded = content.hidden;
+                toggleExpand(btn, content, expanded);
+            });
+        });
+
+        document.querySelectorAll('.alert-card-trigger').forEach(function (btn) {
+            const content = btn.nextElementSibling;
+            if (!content) return;
+            btn.addEventListener('click', function () {
+                const expanded = content.hidden;
+                toggleExpand(btn, content, expanded);
+            });
+        });
+
+        document.querySelectorAll('.hourly-card-trigger').forEach(function (btn) {
+            const card = btn.closest('.hourly-card');
+            const content = card ? card.querySelector('.hourly-expandable') : null;
+            if (!content) return;
+            btn.addEventListener('click', function () {
+                const expanded = content.hidden;
+                toggleExpand(btn, content, expanded);
+                if (expanded) {
+                    const placeholder = content.querySelector('.hourly-chart-placeholder');
+                    if (placeholder && placeholder.dataset.index !== undefined) {
+                        ClearerWeather.renderHourlyChart(placeholder, parseInt(placeholder.dataset.index, 10));
+                    }
+                }
+            });
+        });
+
+        document.querySelectorAll('.daily-card-trigger').forEach(function (btn) {
+            const card = btn.closest('.daily-card');
+            const content = card ? card.querySelector('.daily-expandable') : null;
+            if (!content) return;
+            btn.addEventListener('click', function () {
+                const expanded = content.hidden;
+                toggleExpand(btn, content, expanded);
+                if (expanded) {
+                    const placeholder = content.querySelector('.daily-chart-placeholder');
+                    if (placeholder && placeholder.dataset.periodIndex !== undefined) {
+                        ClearerWeather.renderDailyChart(placeholder, parseInt(placeholder.dataset.periodIndex, 10));
+                    }
+                }
+            });
+        });
+    }
+
+    let chartHourlyData = [];
+
+    function initCharts(data) {
+        chartHourlyData = data || [];
+    }
+
+    function renderHourlyChart(placeholder, startIndex) {
+        if (typeof Chart === 'undefined' || !chartHourlyData.length) return;
+        if (placeholder.chartInstance) {
+            placeholder.chartInstance.destroy();
+        }
+        const ctx = document.createElement('canvas');
+        ctx.width = placeholder.offsetWidth || 280;
+        ctx.height = 120;
+        placeholder.innerHTML = '';
+        placeholder.appendChild(ctx);
+
+        const slice = chartHourlyData.slice(startIndex, startIndex + 12);
+        const labels = slice.map(function (d) { return d.time; });
+        const temps = slice.map(function (d) { return d.temp; });
+        const precip = slice.map(function (d) { return d.precip; });
+
+        const isDark = document.body.classList.contains('theme-dark');
+        const textColor = isDark ? '#8b9cad' : '#656d76';
+
+        placeholder.chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Temp °F',
+                        data: temps,
+                        borderColor: '#58a6ff',
+                        backgroundColor: 'rgba(88, 166, 255, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        yAxisID: 'y',
+                    },
+                    {
+                        label: 'Precip %',
+                        data: precip,
+                        borderColor: '#3fb950',
+                        backgroundColor: 'rgba(63, 185, 80, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                        yAxisID: 'y1',
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: textColor } },
+                },
+                scales: {
+                    x: { ticks: { color: textColor, maxRotation: 45 } },
+                    y: { type: 'linear', display: true, position: 'left', ticks: { color: textColor } },
+                    y1: { type: 'linear', display: true, position: 'right', min: 0, max: 100, ticks: { color: textColor } },
+                },
+            },
+        });
+    }
+
+    function renderDailyChart(placeholder, periodIndex) {
+        if (typeof Chart === 'undefined' || !chartHourlyData.length) return;
+        if (placeholder.chartInstance) {
+            placeholder.chartInstance.destroy();
+        }
+        const ctx = document.createElement('canvas');
+        ctx.width = placeholder.offsetWidth || 280;
+        ctx.height = 120;
+        placeholder.innerHTML = '';
+        placeholder.appendChild(ctx);
+
+        const start = Math.min(periodIndex * 6, Math.max(0, chartHourlyData.length - 24));
+        const slice = chartHourlyData.slice(start, start + 24);
+        if (!slice.length) return;
+        const labels = slice.map(function (d) { return d.time; });
+        const temps = slice.map(function (d) { return d.temp; });
+        const precip = slice.map(function (d) { return d.precip; });
+
+        const isDark = document.body.classList.contains('theme-dark');
+        const textColor = isDark ? '#8b9cad' : '#656d76';
+
+        placeholder.chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Temp °F',
+                        data: temps,
+                        borderColor: '#58a6ff',
+                        backgroundColor: 'rgba(88, 166, 255, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                    },
+                    {
+                        label: 'Precip %',
+                        data: precip,
+                        borderColor: '#3fb950',
+                        backgroundColor: 'rgba(63, 185, 80, 0.1)',
+                        fill: true,
+                        tension: 0.3,
+                    },
+                ],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { labels: { color: textColor } },
+                },
+                scales: {
+                    x: { ticks: { color: textColor, maxRotation: 45 } },
+                    y: { ticks: { color: textColor } },
+                },
+            },
         });
     }
 
@@ -295,8 +590,13 @@ const ClearerWeather = (function () {
         initDashboard: initDashboard,
         initAutocomplete: initAutocomplete,
         initUseLocation: initUseLocation,
-        initAlertExpand: initAlertExpand,
+        initRadar: initRadar,
+        initSectionNav: initSectionNav,
+        initExpandableCards: initExpandableCards,
+        initCharts: initCharts,
         initRemoveFavorite: initRemoveFavorite,
+        renderHourlyChart: renderHourlyChart,
+        renderDailyChart: renderDailyChart,
         showLoading: showLoading,
         hideLoading: hideLoading,
     };
