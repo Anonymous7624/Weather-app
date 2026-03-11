@@ -11,7 +11,7 @@ import requests
 CENSUS_URL = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress"
 # Nominatim - OpenStreetMap fallback
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
-USER_AGENT = "ClearerWeather/1.0 (https://github.com/clearer-weather)"
+USER_AGENT = "Clearcast/1.0 (https://github.com/clearcast)"
 REQUEST_TIMEOUT = 12
 
 

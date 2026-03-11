@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Clearer Weather – Clean Forecasts for Raspberry Pi{% endblock %}
+{% block title %}Clearcast – Intelligent Weather Dashboard{% endblock %}
 
 {% block content %}
 <div class="landing">
     <div class="landing-hero">
-        <h1>Clearer Weather</h1>
-        <p class="tagline">Clean, readable forecasts from the National Weather Service. No clutter, no ads.</p>
+        <h1>Clearcast</h1>
+        <p class="tagline">Intelligent weather forecasts powered by the National Weather Service. Clean design, real-time data, zero noise.</p>
     </div>
 
     <form class="landing-search" action="{{ url_for('weather') }}" method="get">
@@ -54,8 +54,8 @@
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        ClearerWeather.initAutocomplete('landing-search-input', 'landing-suggestions');
-        ClearerWeather.initUseLocation('.landing .use-location-btn');
+        Clearcast.initAutocomplete('landing-search-input', 'landing-suggestions');
+        Clearcast.initUseLocation('.landing .use-location-btn');
     });
 </script>
 {% endblock %}

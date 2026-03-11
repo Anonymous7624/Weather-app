@@ -1,5 +1,5 @@
 [Unit]
-Description=Clearer Weather - NWS weather dashboard for Raspberry Pi
+Description=Clearcast - NWS weather dashboard for Raspberry Pi
 After=network.target
 
 [Service]

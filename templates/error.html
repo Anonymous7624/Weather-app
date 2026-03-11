@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Error – Clearer Weather{% endblock %}
+{% block title %}Error – Clearcast{% endblock %}
 
 {% block content %}
 <div class="error-page">
@@ -29,8 +29,8 @@
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        ClearerWeather.initAutocomplete('error-search-input', 'error-suggestions');
-        ClearerWeather.initUseLocation('.error-page .use-location-btn');
+        Clearcast.initAutocomplete('error-search-input', 'error-suggestions');
+        Clearcast.initUseLocation('.error-page .use-location-btn');
     });
 </script>
 {% endblock %}

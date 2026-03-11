@@ -8,7 +8,7 @@ import requests
 from .normalize import normalize_weather_data
 
 NWS_BASE = "https://api.weather.gov"
-USER_AGENT = "ClearerWeather/1.0 (Raspberry Pi; https://github.com/clearer-weather)"
+USER_AGENT = "Clearcast/1.0 (Raspberry Pi; https://github.com/clearcast)"
 REQUEST_TIMEOUT = 15
 COORD_PRECISION = 4  # NWS recommends up to 4 decimal places
 
