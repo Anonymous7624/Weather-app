@@ -1,0 +1,18 @@
+# Environment
+.env
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+*.so
+
+# Instance data (config, cache)
+instance/
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
