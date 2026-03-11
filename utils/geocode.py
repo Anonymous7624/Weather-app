@@ -102,6 +102,78 @@ def _geocode_nominatim(location_str):
     }
 
 
+def suggest_locations(query, limit=8):
+    """
+    Return list of location suggestions for autocomplete.
+    Uses Census (US) and Nominatim (fallback). Returns list of dicts:
+    [{"display_name": str, "lat": float, "lon": float}, ...]
+    """
+    if not query or not isinstance(query, str):
+        return []
+    q = query.strip()
+    if len(q) < 2:
+        return []
+
+    results = []
+    seen = set()
+
+    def add(r):
+        key = (round(r["lat"], 2), round(r["lon"], 2))
+        if key not in seen:
+            seen.add(key)
+            results.append(r)
+
+    # Try Census first for US addresses/ZIP
+    params = {
+        "address": q,
+        "benchmark": "Public_AR_Current",
+        "format": "json",
+    }
+    try:
+        resp = requests.get(CENSUS_URL, params=params, timeout=REQUEST_TIMEOUT)
+        if resp.ok:
+            matches = resp.json().get("result", {}).get("addressMatches", [])[:limit]
+            for m in matches:
+                coord = m.get("coordinates", {})
+                x, y = coord.get("x"), coord.get("y")
+                if x is not None and y is not None:
+                    add({
+                        "lat": round(float(y), 4),
+                        "lon": round(float(x), 4),
+                        "display_name": m.get("matchedAddress", q),
+                    })
+    except (requests.RequestException, ValueError):
+        pass
+
+    # Fill with Nominatim if needed
+    if len(results) < limit:
+        params = {
+            "q": q,
+            "format": "json",
+            "limit": limit - len(results),
+            "countrycodes": "us",
+        }
+        headers = {"User-Agent": USER_AGENT}
+        try:
+            resp = requests.get(NOMINATIM_URL, params=params, headers=headers, timeout=REQUEST_TIMEOUT)
+            if resp.ok:
+                data = resp.json()
+                if isinstance(data, list):
+                    for item in data:
+                        try:
+                            add({
+                                "lat": round(float(item.get("lat", 0)), 4),
+                                "lon": round(float(item.get("lon", 0)), 4),
+                                "display_name": item.get("display_name", q),
+                            })
+                        except (TypeError, ValueError):
+                            pass
+        except (requests.RequestException, ValueError):
+            pass
+
+    return results[:limit]
+
+
 def resolve_location(location_input):
     """
     Resolve a location string to lat/lon and display name.

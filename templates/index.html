@@ -10,16 +10,25 @@
     </div>
 
     <form class="landing-search" action="{{ url_for('weather') }}" method="get">
-        <input type="text" name="location" placeholder="Enter ZIP code, city/state, or coordinates" 
-               value="{{ default_location }}" autocomplete="off" class="landing-input" required>
-        <button type="submit" class="btn btn-primary btn-lg">Get Forecast</button>
+        <div class="search-wrap landing-search-wrap">
+            <input type="text" name="location" placeholder="Enter ZIP code, city/state, or coordinates"
+                   value="{{ default_location }}" autocomplete="off" class="landing-input" required
+                   id="landing-search-input" aria-label="Search location" aria-autocomplete="list" aria-controls="landing-suggestions" aria-expanded="false">
+            <div id="landing-suggestions" class="search-suggestions hidden" role="listbox"></div>
+        </div>
+        <div class="landing-buttons">
+            <button type="submit" class="btn btn-primary btn-lg">Get Forecast</button>
+            <button type="button" class="btn btn-secondary btn-lg use-location-btn" title="Use my location">
+                📍 Use My Location
+            </button>
+        </div>
     </form>
 
     <p class="landing-hint">Examples: 90210, Boston MA, 42.36,-71.06</p>
 
     {% if favorites %}
     <section class="favorites-section">
-        <h2>Favorite Locations</h2>
+        <h2>★ Favorite Locations</h2>
         <ul class="favorites-list">
             {% for loc in favorites %}
             <li><a href="{{ url_for('weather', location=loc) }}" class="fav-link">{{ loc }}</a></li>
@@ -39,4 +48,14 @@
     </section>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        ClearerWeather.initAutocomplete('landing-search-input', 'landing-suggestions');
+        ClearerWeather.initUseLocation('.landing .use-location-btn');
+    });
+</script>
 {% endblock %}

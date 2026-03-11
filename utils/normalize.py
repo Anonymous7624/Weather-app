@@ -6,6 +6,11 @@ Handles missing fields safely.
 import re
 from datetime import datetime
 
+try:
+    from .sun import get_sunrise_sunset
+except ImportError:
+    get_sunrise_sunset = None
+
 
 def _safe(value, default=""):
     return value if value is not None else default
@@ -93,7 +98,39 @@ def _extract_number(value):
     return None
 
 
-def normalize_weather_data(display_name, forecast, hourly, alerts_data):
+def _c_to_f(c):
+    """Convert Celsius to Fahrenheit."""
+    if c is None:
+        return None
+    try:
+        return round(float(c) * 9 / 5 + 32)
+    except (TypeError, ValueError):
+        return None
+
+
+def _obs_value(obs_props, key):
+    """Extract value from observation property (e.g. temperature.value)."""
+    p = obs_props.get(key, {})
+    if isinstance(p, dict):
+        return p.get("value")
+    return p
+
+
+def _format_obs_time(iso_str):
+    """Format observation timestamp."""
+    if not iso_str:
+        return ""
+    try:
+        if "/" in str(iso_str):
+            iso_str = str(iso_str).split("/")[0]
+        dt = datetime.fromisoformat(str(iso_str).replace("Z", "+00:00"))
+        return dt.strftime("%I:%M %p").replace(" 0", " ")
+    except (ValueError, TypeError):
+        return str(iso_str)[:16]
+
+
+def normalize_weather_data(display_name, forecast, hourly, alerts_data,
+                          observations_data=None, grid_data=None, lat=None, lon=None):
     """Build a single normalized dict for the dashboard template."""
 
     # --- Alerts ---
@@ -101,29 +138,128 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data):
     if alerts_data and "features" in alerts_data:
         for f in alerts_data.get("features", []):
             p = f.get("properties", {})
-            severity = p.get("severity", "").upper()
+            severity = (p.get("severity") or "unknown").lower()
             title = _safe(p.get("event", "Alert"))
-            desc = _safe(p.get("headline", p.get("description", "")))
-            # Truncate long descriptions
-            if len(desc) > 400:
-                desc = desc[:397] + "..."
+            headline = _safe(p.get("headline", ""))
+            desc = _safe(p.get("description", ""))
+            onset = _parse_iso_date(p.get("onset"))
+            expires = _parse_iso_date(p.get("expires"))
+            instruction = _safe(p.get("instruction", ""))
             alerts.append({
                 "title": title,
                 "severity": severity,
+                "headline": headline,
                 "summary": desc,
-                "instruction": _safe(p.get("instruction", "")),
+                "instruction": instruction,
+                "onset": onset,
+                "expires": expires,
             })
 
-    # --- Current conditions (from first period or hourly) ---
+    # --- Current conditions ---
     current = {
         "temp": "—",
         "feels_like": "—",
         "wind": "—",
+        "wind_speed": "—",
+        "wind_direction": "—",
         "humidity": "—",
         "precipitation": "—",
         "summary": "",
         "short_forecast": "",
+        "last_updated": "",
     }
+
+    # Enrich from observations if available
+    if observations_data and "features" in observations_data and observations_data["features"]:
+        obs = observations_data["features"][0]
+        obs_props = obs.get("properties", {})
+        temp_c = _obs_value(obs_props, "temperature")
+        if temp_c is not None:
+            t_f = _c_to_f(temp_c)
+            if t_f is not None:
+                current["temp"] = f"{t_f}°F"
+        wind_speed = _obs_value(obs_props, "windSpeed")
+        wind_dir = _obs_value(obs_props, "windDirection")
+        wind_unit = obs_props.get("windSpeed", {})
+        if isinstance(wind_unit, dict):
+            wind_unit = wind_unit.get("unitCode", "")
+        else:
+            wind_unit = ""
+        if wind_speed is not None:
+            try:
+                v = float(wind_speed)
+                if "m_s" in str(wind_unit) or "ms" in str(wind_unit).lower():
+                    v = v * 2.237  # m/s to mph
+                current["wind_speed"] = f"{int(round(v))} mph"
+            except (TypeError, ValueError):
+                pass
+        if wind_dir is not None:
+            try:
+                d = int(float(wind_dir))
+                dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
+                idx = round(d / 22.5) % 16
+                current["wind_direction"] = dirs[idx]
+            except (TypeError, ValueError):
+                pass
+        if current["wind_speed"] != "—" or current["wind_direction"] != "—":
+            parts = []
+            if current["wind_direction"] != "—":
+                parts.append(current["wind_direction"])
+            if current["wind_speed"] != "—":
+                parts.append(f"at {current['wind_speed']}")
+            current["wind"] = " ".join(parts)
+        rh = _obs_value(obs_props, "relativeHumidity")
+        if rh is not None:
+            try:
+                current["humidity"] = f"{int(float(rh))}%"
+            except (TypeError, ValueError):
+                pass
+        dew_c = _obs_value(obs_props, "dewpoint")
+        if dew_c is not None:
+            d_f = _c_to_f(dew_c)
+            if d_f is not None:
+                current["dew_point"] = f"{d_f}°F"
+        else:
+            current["dew_point"] = "—"
+        vis = _obs_value(obs_props, "visibility")
+        if vis is not None:
+            try:
+                v = float(vis)
+                if v >= 16093:  # 10 miles in meters
+                    current["visibility"] = "10+ mi"
+                else:
+                    current["visibility"] = f"{v / 1609.34:.1f} mi"
+            except (TypeError, ValueError):
+                current["visibility"] = "—"
+        else:
+            current["visibility"] = "—"
+        pressure = _obs_value(obs_props, "barometricPressure")
+        if pressure is not None:
+            try:
+                # NWS often in Pa
+                pa = float(pressure)
+                inhg = pa / 3386.389
+                current["pressure"] = f"{inhg:.2f} inHg"
+            except (TypeError, ValueError):
+                current["pressure"] = "—"
+        else:
+            current["pressure"] = "—"
+        # Wind chill / heat index
+        feels = _obs_value(obs_props, "windChill")
+        if feels is None:
+            feels = _obs_value(obs_props, "heatIndex")
+        if feels is not None:
+            f_f = _c_to_f(feels)
+            if f_f is not None:
+                current["feels_like"] = f"{f_f}°F"
+        # Timestamp
+        ts = obs_props.get("timestamp")
+        if ts:
+            current["last_updated"] = _format_obs_time(ts)
+    else:
+        current["dew_point"] = "—"
+        current["visibility"] = "—"
+        current["pressure"] = "—"
 
     # --- Periods (extended forecast) ---
     periods = []
@@ -164,18 +300,23 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data):
                 "icon": weather_icon(short),
             })
 
-            # Use first period for current if it's "Today" or similar
-            if (is_today or not current["temp"] or current["temp"] == "—") and temp != "—":
-                current["temp"] = temp
-                current["wind"] = wind
-                current["short_forecast"] = short
-                current["summary"] = detailed
-                current["precipitation"] = precip
+            # Use first period for current if we don't have observation data
+            if (is_today or current["temp"] == "—") and temp != "—":
+                if current["temp"] == "—":
+                    current["temp"] = temp
+                if current["wind"] == "—":
+                    current["wind"] = wind
+                current["short_forecast"] = short or current["short_forecast"]
+                current["summary"] = detailed or current["summary"]
+                if current["precipitation"] == "—":
+                    current["precipitation"] = precip
+                if current["feels_like"] == "—":
+                    current["feels_like"] = temp  # Approximate
 
     # --- Hourly ---
     hourly_cards = []
     if hourly and "properties" in hourly:
-        hps = hourly.get("properties", {}).get("periods", [])[:24]
+        hps = hourly.get("properties", {}).get("periods", [])[:24]  # Next 24 hours
         for hp in hps:
             temp = _temp(hp.get("temperature"))
             wind = _wind_string(hp.get("windDirection"), hp.get("windSpeed"))
@@ -205,18 +346,94 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data):
         current["temp"] = h0["temp"]
         current["wind"] = h0["wind"]
         current["short_forecast"] = h0["short_forecast"]
+    if current["feels_like"] == "—" and current["temp"] != "—":
+        current["feels_like"] = current["temp"]
+    for k in ("dew_point", "visibility", "pressure"):
+        if k not in current:
+            current[k] = "—"
+
+    # --- Additional details (humidity, dew point, sunrise/sunset, visibility, pressure, UV) ---
+    details = {
+        "humidity": current.get("humidity", "—"),
+        "dew_point": current.get("dew_point", "—"),
+        "visibility": current.get("visibility", "—"),
+        "pressure": current.get("pressure", "—"),
+        "uv_index": "—",  # NWS doesn't provide; could add OpenUV later
+    }
+    if lat is not None and lon is not None and get_sunrise_sunset:
+        try:
+            sun = get_sunrise_sunset(lat, lon)
+            details["sunrise"] = sun.get("sunrise", "—")
+            details["sunset"] = sun.get("sunset", "—")
+        except Exception:
+            details["sunrise"] = "—"
+            details["sunset"] = "—"
+    else:
+        details["sunrise"] = "—"
+        details["sunset"] = "—"
+
+    # --- Build 7-day daily forecast (pair day+night periods) ---
+    daily = _build_daily_forecast(periods)
 
     # --- Best time to go outside ---
     best_time = _compute_best_time(periods, hourly_cards)
 
     return {
         "location": display_name,
+        "lat": lat,
+        "lon": lon,
         "alerts": alerts,
         "current": current,
         "periods": periods,
+        "daily": daily,
         "hourly": hourly_cards,
+        "details": details,
         "best_time": best_time,
     }
+
+
+def _build_daily_forecast(periods):
+    """Build 7-day daily forecast from period pairs (day + night)."""
+    daily = []
+    i = 0
+    while i < len(periods) and len(daily) < 7:
+        p = periods[i]
+        name = (p.get("name") or "").lower()
+        is_night = "night" in name or "tonight" in name
+        if is_night:
+            # Standalone night period: use as "low" for previous day or add minimal
+            if daily:
+                daily[-1]["low"] = p.get("temp", "—")
+            i += 1
+            continue
+        high = p.get("temp", "—")
+        low = "—"
+        summary = p.get("short_forecast", "")
+        precip = p.get("precip_chance", "—")
+        icon = p.get("icon", "🌤")
+        if i + 1 < len(periods):
+            pn = periods[i + 1]
+            nn = (pn.get("name") or "").lower()
+            if "night" in nn or "tonight" in nn:
+                low = pn.get("temp", "—")
+                if not summary and pn.get("short_forecast"):
+                    summary = pn.get("short_forecast", "")
+                if precip == "—" and pn.get("precip_chance"):
+                    precip = pn.get("precip_chance", "—")
+                i += 2
+            else:
+                i += 1
+        else:
+            i += 1
+        daily.append({
+            "name": p.get("name", "Day"),
+            "high": high,
+            "low": low,
+            "summary": summary,
+            "precip_chance": precip,
+            "icon": icon,
+        })
+    return daily
 
 
 def _compute_best_time(periods, hourly):
