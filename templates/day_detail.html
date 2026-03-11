@@ -1,0 +1,255 @@
+{% extends "base.html" %}
+
+{% block title %}{{ day.name }} — {{ weather.location }} — Clearcast{% endblock %}
+
+{% block content %}
+<div class="day-detail" data-location="{{ location_input }}">
+
+    <!-- Header -->
+    <div class="day-detail-header reveal">
+        <a href="{{ url_for('weather', location=location_input) }}" class="day-detail-back">
+            <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            Back to Dashboard
+        </a>
+        <div class="day-detail-title-row">
+            <span style="font-size: 3rem; display: block; margin-bottom: 0.5rem;">{{ day.icon }}</span>
+            <h1 class="day-detail-title">{{ day.name }}</h1>
+        </div>
+        {% if day_date %}
+        <p class="day-detail-subtitle">{{ day_date }}</p>
+        {% endif %}
+        <p class="day-detail-location">{{ weather.location }}</p>
+
+        <!-- Day navigation -->
+        <div class="day-nav">
+            {% if prev_index is not none %}
+            <a href="{{ url_for('weather_day', day_index=prev_index, location=location_input) }}" class="day-nav-btn">
+                &larr; {{ weather.daily[prev_index].name }}
+            </a>
+            {% endif %}
+            {% if next_index is not none %}
+            <a href="{{ url_for('weather_day', day_index=next_index, location=location_input) }}" class="day-nav-btn">
+                {{ weather.daily[next_index].name }} &rarr;
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="day-summary-grid reveal reveal-delay-1">
+        <div class="day-summary-card">
+            <div class="day-summary-card-icon">&#127777;&#65039;</div>
+            <div class="day-summary-card-label">High</div>
+            <div class="day-summary-card-value">{{ day.high }}</div>
+        </div>
+        <div class="day-summary-card">
+            <div class="day-summary-card-icon">&#10052;&#65039;</div>
+            <div class="day-summary-card-label">Low</div>
+            <div class="day-summary-card-value">{{ day.low }}</div>
+        </div>
+        <div class="day-summary-card">
+            <div class="day-summary-card-icon">&#128167;</div>
+            <div class="day-summary-card-label">Precip</div>
+            <div class="day-summary-card-value">{{ day.precip_chance }}</div>
+        </div>
+        <div class="day-summary-card">
+            <div class="day-summary-card-icon">&#127788;&#65039;</div>
+            <div class="day-summary-card-label">Wind</div>
+            <div class="day-summary-card-value">{{ day.wind }}</div>
+        </div>
+        <div class="day-summary-card">
+            <div class="day-summary-card-icon">{{ day.icon }}</div>
+            <div class="day-summary-card-label">Conditions</div>
+            <div class="day-summary-card-value" style="font-size: 0.9rem;">{{ day.summary }}</div>
+        </div>
+        {% if day.wind_direction %}
+        <div class="day-summary-card">
+            <div class="day-summary-card-icon">&#127744;</div>
+            <div class="day-summary-card-label">Wind Dir</div>
+            <div class="day-summary-card-value">{{ day.wind_direction }}</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Tabs -->
+    <div class="detail-tabs reveal reveal-delay-2" role="tablist">
+        <button class="detail-tab active" role="tab" data-tab="overview" aria-selected="true">Overview</button>
+        <button class="detail-tab" role="tab" data-tab="hourly" aria-selected="false">Hourly</button>
+        <button class="detail-tab" role="tab" data-tab="charts" aria-selected="false">Charts</button>
+        <button class="detail-tab" role="tab" data-tab="conditions" aria-selected="false">Conditions</button>
+        {% if weather.alerts %}
+        <button class="detail-tab" role="tab" data-tab="alerts" aria-selected="false">Alerts ({{ weather.alerts|length }})</button>
+        {% endif %}
+    </div>
+
+    <!-- Tab: Overview -->
+    <div class="detail-tab-panel active reveal reveal-delay-3" data-tab-panel="overview" role="tabpanel">
+        <div class="forecast-narrative">
+            <h3>&#9729; Daytime Forecast</h3>
+            {% if day.detailed_forecast %}
+            <p>{{ day.detailed_forecast }}</p>
+            {% else %}
+            <p>{{ day.summary }}</p>
+            {% endif %}
+
+            {% if day.night_detailed_forecast %}
+            <h3 style="margin-top: 1.25rem;">&#127763; Evening &amp; Night</h3>
+            <p>{{ day.night_detailed_forecast }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Tab: Hourly -->
+    <div class="detail-tab-panel" data-tab-panel="hourly" role="tabpanel">
+        {% if day_hourly %}
+        <div class="day-hourly-grid">
+            {% for h in day_hourly %}
+            <div class="day-hourly-card">
+                <div class="day-hourly-time">{{ h.time }}</div>
+                <div class="day-hourly-icon">{{ h.icon }}</div>
+                <div class="day-hourly-temp">{{ h.temp }}</div>
+                <div class="day-hourly-desc">{{ h.short_forecast }}</div>
+                <div class="day-hourly-meta">
+                    &#128167; {{ h.precip }}<br>
+                    &#127788;&#65039; {{ h.wind }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="no-data-message">
+            <p>Hourly data is only available for the next 48 hours. Detailed hourly data for this day is not yet available.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Tab: Charts -->
+    <div class="detail-tab-panel" data-tab-panel="charts" role="tabpanel">
+        {% if day_chart %}
+        <div class="day-charts-grid">
+            <div class="chart-card">
+                <h4>&#127777;&#65039; Temperature</h4>
+                <div class="chart-container" id="day-temp-chart"></div>
+            </div>
+            <div class="chart-card">
+                <h4>&#128167; Precipitation Chance</h4>
+                <div class="chart-container" id="day-precip-chart"></div>
+            </div>
+            <div class="chart-card">
+                <h4>&#127788;&#65039; Wind Speed</h4>
+                <div class="chart-container" id="day-wind-chart"></div>
+            </div>
+            <div class="chart-card">
+                <h4>&#128167; Humidity</h4>
+                <div class="chart-container" id="day-humidity-chart"></div>
+            </div>
+        </div>
+        {% else %}
+        <div class="no-data-message">
+            <p>Chart data is only available for the next 48 hours. Chart data for this day is not yet available.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Tab: Conditions -->
+    <div class="detail-tab-panel" data-tab-panel="conditions" role="tabpanel">
+        <div class="day-summary-grid" style="max-width: 600px;">
+            <div class="day-summary-card">
+                <div class="day-summary-card-label">High Temperature</div>
+                <div class="day-summary-card-value">{{ day.high }}</div>
+            </div>
+            <div class="day-summary-card">
+                <div class="day-summary-card-label">Low Temperature</div>
+                <div class="day-summary-card-value">{{ day.low }}</div>
+            </div>
+            <div class="day-summary-card">
+                <div class="day-summary-card-label">Precipitation</div>
+                <div class="day-summary-card-value">{{ day.precip_chance }}</div>
+            </div>
+            <div class="day-summary-card">
+                <div class="day-summary-card-label">Wind</div>
+                <div class="day-summary-card-value">{{ day.wind }}</div>
+            </div>
+            {% if day.wind_direction %}
+            <div class="day-summary-card">
+                <div class="day-summary-card-label">Wind Direction</div>
+                <div class="day-summary-card-value">{{ day.wind_direction }}</div>
+            </div>
+            {% endif %}
+            <div class="day-summary-card">
+                <div class="day-summary-card-label">Sky</div>
+                <div class="day-summary-card-value" style="font-size: 0.9rem;">{{ day.summary }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Alerts -->
+    {% if weather.alerts %}
+    <div class="detail-tab-panel" data-tab-panel="alerts" role="tabpanel">
+        <div class="alerts-list">
+            {% for a in weather.alerts %}
+            <div class="alert-card severity-{{ a.severity }}" data-expanded="false">
+                <button type="button" class="alert-card-trigger" aria-expanded="false" aria-controls="day-alert-detail-{{ loop.index }}">
+                    <div class="alert-header">
+                        <h3 class="alert-title">{{ a.title }}</h3>
+                        <span class="severity-badge severity-{{ a.severity }}">{{ a.severity|upper }}</span>
+                    </div>
+                    {% if a.onset or a.expires %}
+                    <p class="alert-timing">
+                        {% if a.onset %}{{ a.onset }}{% endif %}
+                        {% if a.onset and a.expires %} &rarr; {% endif %}
+                        {% if a.expires %}{{ a.expires }}{% endif %}
+                    </p>
+                    {% endif %}
+                    <p class="alert-summary-preview">{{ (a.headline or a.summary)|truncate(120) }}</p>
+                    <span class="expand-chevron" aria-hidden="true">&#9660;</span>
+                </button>
+                <div id="day-alert-detail-{{ loop.index }}" class="alert-detail expandable" hidden>
+                    <div class="alert-detail-inner">
+                        {% if a.summary %}
+                        <p class="alert-description">{{ a.summary }}</p>
+                        {% endif %}
+                        {% if a.instruction %}
+                        <p class="alert-instruction"><strong>What to do:</strong> {{ a.instruction }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Back to dashboard -->
+    <div class="dashboard-actions reveal">
+        <a href="{{ url_for('weather', location=location_input) }}" class="btn btn-primary">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+            Back to Dashboard
+        </a>
+        {% if prev_index is not none %}
+        <a href="{{ url_for('weather_day', day_index=prev_index, location=location_input) }}" class="btn btn-secondary">&larr; {{ weather.daily[prev_index].name }}</a>
+        {% endif %}
+        {% if next_index is not none %}
+        <a href="{{ url_for('weather_day', day_index=next_index, location=location_input) }}" class="btn btn-secondary">{{ weather.daily[next_index].name }} &rarr;</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        Clearcast.initDayDetail();
+        Clearcast.initAutocomplete('header-search-input', 'search-suggestions');
+        Clearcast.initUseLocation('.nav .use-location-btn');
+        Clearcast.initExpandableCards();
+
+        var chartData = {{ day_chart|tojson }};
+        if (chartData && chartData.length) {
+            Clearcast.renderDayCharts(chartData);
+        }
+    });
+</script>
+{% endblock %}
