@@ -25,7 +25,7 @@
                 <form class="nav-search-form" action="{{ url_for('weather') }}" method="get" role="search">
                     <div class="search-wrap">
                         <input type="text" name="location" placeholder="Search location&hellip;"
-                               value="{{ nav_search_value if nav_search_value is defined else (location_input|default('', true)) }}" autocomplete="off"
+                               value="" autocomplete="off"
                                class="nav-search-input" id="header-search-input"
                                aria-label="Search location" aria-autocomplete="list"
                                aria-controls="search-suggestions" aria-expanded="false">
