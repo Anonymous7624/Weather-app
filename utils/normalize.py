@@ -4,7 +4,7 @@ Handles missing fields safely. All temperatures output in Fahrenheit.
 """
 
 import re
-from datetime import datetime, timezone as _tz
+from datetime import datetime, timedelta, timezone as _tz
 
 try:
     from zoneinfo import ZoneInfo
@@ -329,6 +329,83 @@ def _is_night_period(name):
     return "night" in n or "evening" in n or "overnight" in n
 
 
+def _normalize_wind_direction(direction):
+    """Normalize NWS wind direction to standard 16-point abbreviation (N, NNE, NE, etc.)."""
+    if not direction:
+        return ""
+    s = str(direction).strip().upper()
+    if not s:
+        return ""
+    # NWS can return "NW", "Northwest", "North West", etc. Map to standard abbreviations.
+    _DIR_MAP = {
+        "N": "N", "NORTH": "N",
+        "NNE": "NNE", "NORTH NORTHEAST": "NNE", "NORTH-NORTHEAST": "NNE",
+        "NE": "NE", "NORTHEAST": "NE", "NORTH EAST": "NE",
+        "ENE": "ENE", "EAST NORTHEAST": "ENE", "EAST-NORTHEAST": "ENE",
+        "E": "E", "EAST": "E",
+        "ESE": "ESE", "EAST SOUTHEAST": "ESE", "EAST-SOUTHEAST": "ESE",
+        "SE": "SE", "SOUTHEAST": "SE", "SOUTH EAST": "SE",
+        "SSE": "SSE", "SOUTH SOUTHEAST": "SSE", "SOUTH-SOUTHEAST": "SSE",
+        "S": "S", "SOUTH": "S",
+        "SSW": "SSW", "SOUTH SOUTHWEST": "SSW", "SOUTH-SOUTHWEST": "SSW",
+        "SW": "SW", "SOUTHWEST": "SW", "SOUTH WEST": "SW",
+        "WSW": "WSW", "WEST SOUTHWEST": "WSW", "WEST-SOUTHWEST": "WSW",
+        "W": "W", "WEST": "W",
+        "WNW": "WNW", "WEST NORTHWEST": "WNW", "WEST-NORTHWEST": "WNW",
+        "NW": "NW", "NORTHWEST": "NW", "NORTH WEST": "NW",
+        "NNW": "NNW", "NORTH NORTHWEST": "NNW", "NORTH-NORTHWEST": "NNW",
+    }
+    return _DIR_MAP.get(s, direction.strip() if len(s) <= 3 else "")
+
+
+def _get_current_hourly_index(periods, tz_name=""):
+    """Return the index of the hourly period that covers 'now'.
+    Uses startTime/endTime to find the period containing the current moment in local time.
+    """
+    if not periods:
+        return 0
+    try:
+        now = datetime.now(_tz.utc)
+        if tz_name and ZoneInfo:
+            now = now.astimezone(ZoneInfo(tz_name))
+        for i, p in enumerate(periods):
+            start_s = p.get("startTime") or ""
+            end_s = p.get("endTime") or ""
+            if not start_s:
+                continue
+            if "/" in str(start_s):
+                start_s = str(start_s).split("/")[0]
+            start_dt = datetime.fromisoformat(str(start_s).replace("Z", "+00:00"))
+            if tz_name and ZoneInfo:
+                start_dt = start_dt.astimezone(ZoneInfo(tz_name))
+            if end_s:
+                if "/" in str(end_s):
+                    end_s = str(end_s).split("/")[0]
+                end_dt = datetime.fromisoformat(str(end_s).replace("Z", "+00:00"))
+                if tz_name and ZoneInfo:
+                    end_dt = end_dt.astimezone(ZoneInfo(tz_name))
+            else:
+                end_dt = start_dt + timedelta(hours=1)
+            if start_dt <= now < end_dt:
+                return i
+        # If now is before first period, use 0. If now is after all, use last.
+        first_start = None
+        for p in periods:
+            s = p.get("startTime") or ""
+            if "/" in str(s):
+                s = str(s).split("/")[0]
+            if s:
+                first_start = datetime.fromisoformat(str(s).replace("Z", "+00:00"))
+                if tz_name and ZoneInfo:
+                    first_start = first_start.astimezone(ZoneInfo(tz_name))
+                break
+        if first_start and now < first_start:
+            return 0
+        return max(0, len(periods) - 1)
+    except (ValueError, TypeError, KeyError):
+        return 0
+
+
 def normalize_weather_data(display_name, forecast, hourly, alerts_data,
                           observations_data=None, grid_data=None, lat=None, lon=None,
                           station_name=None, station_id=None, timezone=""):
@@ -513,7 +590,8 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
             temp = _temp_str(raw_temp, p_temp_unit)
             temp_value = _ensure_f(raw_temp, p_temp_unit)
 
-            wind = _wind_string(p.get("windDirection"), p.get("windSpeed"))
+            wind_dir = _normalize_wind_direction(p.get("windDirection")) or p.get("windDirection")
+            wind = _wind_string(wind_dir, p.get("windSpeed"))
             short = _safe(p.get("shortForecast", ""))
             detailed = _safe(p.get("detailedForecast", ""))
             start = _parse_iso_date(p.get("startTime", ""), tz)
@@ -560,7 +638,7 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
                 "is_tonight": is_tonight,
                 "is_tomorrow": is_tomorrow,
                 "icon": weather_icon(short),
-                "wind_direction": p.get("windDirection"),
+                "wind_direction": wind_dir or p.get("windDirection"),
                 "index": len(periods),
                 "apparent_temp": f"{apparent}\u00b0F" if apparent is not None else "\u2014",
                 "apparent_temp_value": apparent,
@@ -598,7 +676,8 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
             temp = _temp_str(raw_temp, hp_unit)
             temp_f = _ensure_f(raw_temp, hp_unit)
 
-            wind = _wind_string(hp.get("windDirection"), hp.get("windSpeed"))
+            wind_dir = _normalize_wind_direction(hp.get("windDirection")) or hp.get("windDirection")
+            wind = _wind_string(wind_dir, hp.get("windSpeed"))
             short = _safe(hp.get("shortForecast", ""))
             start = hp.get("startTime", "")
             time_str = _short_time(start, tz)
@@ -623,6 +702,7 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
                 "temp": temp,
                 "temp_value": temp_f,
                 "wind": wind,
+                "wind_direction": wind_dir or hp.get("windDirection"),
                 "wind_speed_value": wind_speed_val,
                 "short_forecast": short,
                 "precip": precip_str,
@@ -670,12 +750,26 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
 
     current["icon"] = weather_icon(current.get("short_forecast", ""))
 
-    if current["temp"] == "\u2014" and hourly_cards:
-        h0 = hourly_cards[0]
-        current["temp"] = h0["temp"]
-        current["temp_value"] = h0["temp_value"]
-        current["wind"] = h0["wind"]
-        current["short_forecast"] = h0["short_forecast"]
+    # Unify current wind from hourly forecast so Current Conditions matches hourly cards and charts
+    current_hourly_idx = 0
+    h_current = None
+    if hourly_cards:
+        hps = hourly.get("properties", {}).get("periods", []) if hourly and "properties" in hourly else []
+        current_hourly_idx = _get_current_hourly_index(hps, tz) if hps else 0
+        h_current = hourly_cards[current_hourly_idx]
+
+    if h_current:
+        current["wind"] = h_current["wind"]
+        current["wind_speed_value"] = h_current.get("wind_speed_value")
+        current["wind_speed"] = (
+            f"{current['wind_speed_value']} mph" if current.get("wind_speed_value") is not None else "\u2014"
+        )
+        current["wind_direction"] = h_current.get("wind_direction") or "\u2014"
+
+    if current["temp"] == "\u2014" and h_current:
+        current["temp"] = h_current["temp"]
+        current["temp_value"] = h_current["temp_value"]
+        current["short_forecast"] = h_current["short_forecast"]
     if current["feels_like"] == "\u2014" and current["temp"] != "\u2014":
         if current.get("temp_value") is not None:
             computed = calc_apparent_temp(

@@ -1209,7 +1209,10 @@ var Clearcast = (function () {
                     plugins: Object.assign({}, baseOpts.plugins, {
                         tooltip: Object.assign({}, baseOpts.plugins.tooltip, {
                             callbacks: {
-                                label: function (ctx) { return ctx.parsed.y + ' mph'; },
+                                label: function (ctx) {
+                                    var v = ctx.parsed.y;
+                                    return (v != null && v !== '') ? v + ' mph' : '\u2014';
+                                },
                             },
                         }),
                     }),
