@@ -29,6 +29,11 @@ def _parse_lat_lon(input_str):
     return None
 
 
+def is_coord_input(input_str):
+    """Return True if input looks like raw lat,lon coordinates."""
+    return _parse_lat_lon(input_str or "") is not None
+
+
 def _geocode_census(location_str):
     """Geocode using US Census Bureau API. Returns dict or None."""
     params = {
@@ -245,15 +250,16 @@ def resolve_location(location_input):
         if cached:
             return cached
 
-        place_name = _reverse_geocode_nominatim(lat, lon)
-        display = place_name or f"{lat:.2f}, {lon:.2f}"
+        # Do NOT block on reverse geocoding — show forecast immediately.
+        # Use "Your location" for fast UX. Reverse geocode can populate cache
+        # later if needed (or on next visit).
+        display = f"Your location"
         result = {
             "lat": rlat,
             "lon": rlon,
             "display_name": display,
             "coords_label": f"{rlat}, {rlon}",
         }
-        set_cached_geocode(cache_key, result)
         return result
 
     cached = get_cached_geocode(s)
