@@ -76,6 +76,11 @@ def _filter_chart_for_day(weather_data, day):
     return result if result else weather_data.get("chart_hourly", [])[:24]
 
 
+def _coord_cache_key(lat, lon):
+    """Normalize coordinates to a stable cache key."""
+    return f"{round(float(lat), 4)},{round(float(lon), 4)}"
+
+
 def _get_weather_for_location(location_input):
     """Get weather data from cache or fetch fresh. Returns (weather_data, error_tuple)."""
     cache_key = location_input.lower().strip()
@@ -91,11 +96,18 @@ def _get_weather_for_location(location_input):
     lon = geocode_result["lon"]
     display_name = geocode_result.get("display_name", location_input)
 
+    coord_key = _coord_cache_key(lat, lon)
+    cached = get_cached_weather(coord_key)
+    if cached:
+        set_cached_weather(cache_key, cached)
+        return cached, None
+
     weather_data = fetch_weather_data(lat, lon, display_name)
     if not weather_data:
         return None, ("api_error", location_input)
 
     set_cached_weather(cache_key, weather_data)
+    set_cached_weather(coord_key, weather_data)
     return weather_data, None
 
 
@@ -194,30 +206,6 @@ def weather_day(day_index):
         next_index=next_index,
         is_today=is_today,
     )
-
-
-# TODO: Historical weather endpoint placeholder.
-#
-# The NWS observations API supports historical queries:
-#   GET /stations/{stationId}/observations?start={ISO}&end={ISO}
-#
-# A future /api/history?location=...&days=3 endpoint could:
-#   1. Resolve location → station ID (already done in nws.py)
-#   2. Fetch 72 hours of observations
-#   3. Aggregate into daily summaries (high, low, conditions, precip)
-#   4. Return JSON for client-side rendering
-#
-# This is deferred because the current NWS API flow only fetches the
-# latest observation. Adding reliable aggregation of raw hourly
-# observations into daily summaries requires careful handling of
-# missing data and varying station reporting intervals.
-#
-# @app.route("/api/history")
-# def weather_history():
-#     location_input = request.args.get("location", "").strip()
-#     days = min(int(request.args.get("days", 3)), 7)
-#     # ... resolve location, fetch observations, aggregate, return JSON
-#     pass
 
 
 @app.route("/api/geocode-suggest")
