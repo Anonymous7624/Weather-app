@@ -9,14 +9,7 @@
     <div class="dashboard-hero reveal">
         <h1 class="location-title">{{ weather.location }}</h1>
         <p class="location-updated">{% if weather.current.last_updated %}Updated {{ weather.current.last_updated }}{% endif %}</p>
-        {% if not is_favorite %}
-        <button type="button" class="btn btn-secondary fav-toggle-btn add-favorite-btn" data-location="{{ location_input }}">
-            &#9733; Add to Favorites
-        </button>
-        {% else %}
-        <button type="button" class="btn btn-secondary fav-toggle-btn" disabled>&#9733; In Favorites</button>
-        <button type="button" class="btn btn-outline fav-toggle-btn remove-favorite-btn" data-location="{{ location_input }}" style="margin-left: 0.5rem;">Remove</button>
-        {% endif %}
+        <div class="fav-toggle-wrap" id="fav-toggle-hero" data-location="{{ location_input }}"></div>
     </div>
 
     <!-- Section Navigation -->
@@ -28,18 +21,11 @@
         <a href="#alerts" class="nav-pill" data-section="alerts">Alerts{% if weather.alerts %} ({{ weather.alerts|length }}){% endif %}</a>
     </nav>
 
-    {% if favorites and favorites|length > 1 %}
-    <section class="favorites-switch reveal reveal-delay-2">
+    <!-- Favorites Quick Switch (populated by JS from localStorage) -->
+    <section class="favorites-switch reveal reveal-delay-2" id="fav-switch-bar" style="display:none">
         <span class="fav-label">Quick switch:</span>
-        <div class="fav-pills">
-            {% for fav in favorites %}
-            {% if fav|lower != location_input|lower %}
-            <a href="{{ url_for('weather', location=fav) }}" class="fav-pill">{{ fav }}</a>
-            {% endif %}
-            {% endfor %}
-        </div>
+        <div class="fav-pills" id="fav-switch-pills"></div>
     </section>
-    {% endif %}
 
     <!-- Alerts -->
     {% if weather.alerts %}
@@ -88,7 +74,7 @@
                     {% if weather.current.icon %}<span class="current-icon">{{ weather.current.icon }}</span>{% endif %}
                     <div class="current-temp-block">
                         <span class="current-temp">{{ weather.current.temp }}</span>
-                        {% if weather.current.feels_like and weather.current.feels_like != '—' %}
+                        {% if weather.current.feels_like and weather.current.feels_like != '—' and weather.current.feels_like != weather.current.temp %}
                         <span class="current-feels">Feels like {{ weather.current.feels_like }}</span>
                         {% endif %}
                     </div>
@@ -103,18 +89,65 @@
                         {% endif %}
                     </ul>
                 </div>
-                <button type="button" class="current-expand-btn" aria-expanded="false" data-expand-target="current-details">Show details</button>
-                <div id="current-details" class="expandable" hidden>
+                <button type="button" class="current-expand-btn" aria-expanded="false" data-expand-target="current-details">More info</button>
+                <div id="current-details" class="details-expandable expandable" hidden>
+                    {% if weather.details.station_name or weather.details.station_id %}
+                    <div class="observation-source">
+                        <span class="observation-source-icon" aria-hidden="true">&#128225;</span>
+                        <div class="observation-source-text">
+                            <span class="observation-source-label">Observation Station</span>
+                            <span class="observation-source-name">
+                                {{ weather.details.station_name }}{% if weather.details.station_id %} ({{ weather.details.station_id }}){% endif %}
+                            </span>
+                            {% if weather.details.last_updated_full %}
+                            <span class="observation-source-time">Recorded {{ weather.details.last_updated_full }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
                     <div class="details-grid">
-                        <div class="detail-item"><span class="detail-label">Humidity</span><span class="detail-value">{{ weather.details.humidity }}</span></div>
-                        <div class="detail-item"><span class="detail-label">Dew Point</span><span class="detail-value">{{ weather.details.dew_point }}</span></div>
-                        <div class="detail-item"><span class="detail-label">Visibility</span><span class="detail-value">{{ weather.details.visibility }}</span></div>
-                        <div class="detail-item"><span class="detail-label">Pressure</span><span class="detail-value">{{ weather.details.pressure }}</span></div>
-                        {% if weather.current.wind_gust and weather.current.wind_gust != '—' %}
-                        <div class="detail-item"><span class="detail-label">Wind Gust</span><span class="detail-value">{{ weather.current.wind_gust }}</span></div>
+                        {% if weather.details.feels_like and weather.details.feels_like != '—' %}
+                        <div class="detail-item">
+                            <span class="detail-label">Feels Like</span>
+                            <span class="detail-value">{{ weather.details.feels_like }}</span>
+                        </div>
                         {% endif %}
-                        <div class="detail-item"><span class="detail-label">Sunrise</span><span class="detail-value">{{ weather.details.sunrise }}</span></div>
-                        <div class="detail-item"><span class="detail-label">Sunset</span><span class="detail-value">{{ weather.details.sunset }}</span></div>
+                        <div class="detail-item">
+                            <span class="detail-label">Humidity</span>
+                            <span class="detail-value">{{ weather.details.humidity }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Dew Point</span>
+                            <span class="detail-value">{{ weather.details.dew_point }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Pressure</span>
+                            <span class="detail-value">{{ weather.details.pressure }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Visibility</span>
+                            <span class="detail-value">{{ weather.details.visibility }}</span>
+                        </div>
+                        {% if weather.details.wind_gust and weather.details.wind_gust != '—' %}
+                        <div class="detail-item">
+                            <span class="detail-label">Wind Gust</span>
+                            <span class="detail-value">{{ weather.details.wind_gust }}</span>
+                        </div>
+                        {% endif %}
+                        {% if weather.details.cloud_cover and weather.details.cloud_cover != '—' %}
+                        <div class="detail-item detail-item-wide">
+                            <span class="detail-label">Cloud Cover</span>
+                            <span class="detail-value">{{ weather.details.cloud_cover }}</span>
+                        </div>
+                        {% endif %}
+                        <div class="detail-item">
+                            <span class="detail-label">Sunrise</span>
+                            <span class="detail-value">{{ weather.details.sunrise }}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Sunset</span>
+                            <span class="detail-value">{{ weather.details.sunset }}</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -222,10 +255,24 @@
         <p class="radar-hint">Centered on {{ weather.location }}</p>
         <div class="radar-container">
             <div id="radar-map" class="radar-map" data-lat="{{ weather.lat|default(39) }}" data-lon="{{ weather.lon|default(-98) }}"></div>
+            <div class="radar-controls" id="radar-controls" style="display:none">
+                <div class="radar-controls-row">
+                    <button type="button" id="radar-play" class="radar-play-btn" title="Play/Pause" aria-label="Play radar animation">&#9654;</button>
+                    <input type="range" id="radar-slider" class="radar-slider" min="0" max="0" value="0" aria-label="Radar timeline">
+                    <span id="radar-time" class="radar-time-label"></span>
+                    <span id="radar-type" class="radar-type-badge"></span>
+                </div>
+                <div class="radar-controls-row radar-quick-row">
+                    <button type="button" class="radar-quick-btn" data-range="past">Past</button>
+                    <button type="button" class="radar-quick-btn active" data-range="now">Now</button>
+                    <button type="button" class="radar-quick-btn" data-range="forecast">Forecast</button>
+                </div>
+                <p class="radar-disclaimer" id="radar-disclaimer"></p>
+            </div>
         </div>
     </section>
 
-    <!-- No Alerts state (shown when section nav clicks to alerts but there are none) -->
+    <!-- No Alerts state -->
     {% if not weather.alerts %}
     <section id="alerts" class="dashboard-section reveal" data-section="alerts">
         <h2 class="section-title"><span class="section-title-icon">&#9888;&#65039;</span> Active Alerts</h2>
@@ -238,14 +285,7 @@
 
     <!-- Actions -->
     <div class="dashboard-actions reveal">
-        {% if not is_favorite %}
-        <button type="button" class="btn btn-secondary add-favorite-btn" data-location="{{ location_input }}">
-            &#9733; Add to Favorites
-        </button>
-        {% else %}
-        <button type="button" class="btn btn-secondary" disabled>&#9733; In Favorites</button>
-        <button type="button" class="btn btn-outline remove-favorite-btn" data-location="{{ location_input }}">Remove from Favorites</button>
-        {% endif %}
+        <div id="fav-toggle-actions" data-location="{{ location_input }}"></div>
         <a href="{{ url_for('weather', location=location_input) }}" class="btn btn-secondary">Refresh</a>
         <span class="auto-refresh-note">Auto-refreshes every 10 min</span>
     </div>
@@ -272,7 +312,8 @@
         Clearcast.initSectionNav();
         Clearcast.initExpandableCards();
         Clearcast.initCharts(weatherData.chartHourly);
-        Clearcast.initRemoveFavorite();
+        Clearcast.initFavorites(weatherData.location);
+        Clearcast.addRecent(weatherData.location);
     });
 </script>
 {% endblock %}
