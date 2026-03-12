@@ -177,6 +177,24 @@ def suggest_locations(query, limit=8):
     return results[:limit]
 
 
+def reverse_geocode(lat, lon):
+    """
+    Reverse geocode lat/lon to a human-readable place name (e.g., "Near Boston, MA").
+    Returns the place name or None on failure. Uses cache when available.
+    """
+    rlat = round(float(lat), 4)
+    rlon = round(float(lon), 4)
+    cache_key = f"rev:{rlat},{rlon}"
+    cached = get_cached_geocode(cache_key)
+    if cached:
+        return cached.get("display_name")
+    name = _reverse_geocode_nominatim(rlat, rlon)
+    if name:
+        result = {"lat": rlat, "lon": rlon, "display_name": name, "coords_label": f"{rlat}, {rlon}"}
+        set_cached_geocode(cache_key, result)
+    return name
+
+
 def _reverse_geocode_nominatim(lat, lon):
     """Reverse geocode lat/lon to a human-readable place name via Nominatim."""
     params = {
@@ -250,14 +268,12 @@ def resolve_location(location_input):
         if cached:
             return cached
 
-        # Do NOT block on reverse geocoding — show forecast immediately.
-        # Use "Your location" for fast UX. Reverse geocode can populate cache
-        # later if needed (or on next visit).
-        display = f"Your location"
+        # Return coords with coords_label; display_name filled by app.py
+        # via parallel reverse_geocode (does not block forecast fetch).
         result = {
             "lat": rlat,
             "lon": rlon,
-            "display_name": display,
+            "display_name": None,  # Filled by caller from reverse_geocode
             "coords_label": f"{rlat}, {rlon}",
         }
         return result
