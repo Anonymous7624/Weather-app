@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="s" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f0883e"/>
+      <stop offset="100%" stop-color="#d29922"/>
+    </linearGradient>
+    <linearGradient id="c" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#79b8ff"/>
+      <stop offset="100%" stop-color="#58a6ff"/>
+    </linearGradient>
+  </defs>
+  <circle cx="42" cy="20" r="11" fill="url(#s)"/>
+  <g stroke="url(#s)" stroke-width="2.5" stroke-linecap="round">
+    <line x1="42" y1="4" x2="42" y2="8"/>
+    <line x1="42" y1="32" x2="42" y2="36"/>
+    <line x1="26" y1="20" x2="30" y2="20"/>
+    <line x1="54" y1="20" x2="58" y2="20"/>
+    <line x1="30.7" y1="8.7" x2="33.5" y2="11.5"/>
+    <line x1="50.5" y1="28.5" x2="53.3" y2="31.3"/>
+    <line x1="30.7" y1="31.3" x2="33.5" y2="28.5"/>
+    <line x1="50.5" y1="11.5" x2="53.3" y2="8.7"/>
+  </g>
+  <path d="M12,50 a11,11 0 0 1 0,-22 c0.5,-5 4.5,-9 9.5,-9 a13,13 0 0 1 25,4.5 c0.5,0 1,-0.1 1.5,-0.1 a8.5,8.5 0 0 1 0,17 H12z" fill="url(#c)"/>
+</svg>

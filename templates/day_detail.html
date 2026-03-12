@@ -18,7 +18,7 @@
         {% if day_date %}
         <p class="day-detail-subtitle">{{ day_date }}</p>
         {% endif %}
-        <p class="day-detail-location">{{ weather.location }}</p>
+        <p class="day-detail-location">{{ weather.location }}{% if weather.coords_label %} <span class="coords-secondary">({{ weather.coords_label }})</span>{% endif %}</p>
 
         <!-- Day navigation -->
         <div class="day-nav">
