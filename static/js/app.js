@@ -1,7 +1,7 @@
 /**
  * Clearcast — Unified JS
  * Theme, autocomplete, geolocation, radar animation, charts, favorites/recents
- * (localStorage), progressive disclosure, scroll reveal, tabs
+ * (localStorage), progressive disclosure, scroll reveal, tabs, apparent temp
  */
 
 var Clearcast = (function () {
@@ -10,11 +10,12 @@ var Clearcast = (function () {
     var loadingId = 'loading-overlay';
     var DEBOUNCE_MS = 300;
 
-    /* ─── Constants for localStorage ─── */
+    /* ─── Constants for localStorage (per-user, browser-only) ─── */
     var FAVORITES_KEY = 'clearcast-favorites';
     var RECENTS_KEY = 'clearcast-recents';
     var MAX_FAVORITES = 10;
     var MAX_RECENTS = 5;
+    var RECENTS_DEFAULT_VISIBLE = 3;
 
     /* ─── Loading overlay ─── */
     function showLoading() {
@@ -262,6 +263,8 @@ var Clearcast = (function () {
 
     /* ────────────────────────────────────────────
      * Favorites & Recents (localStorage per-user)
+     * No server-side storage — all data stays in
+     * the user's browser via localStorage only.
      * ──────────────────────────────────────────── */
     function getFavorites() {
         try {
@@ -360,21 +363,18 @@ var Clearcast = (function () {
         function render() {
             var isFav = isFavorite(currentLocation);
 
-            // Hero area
             var heroWrap = document.getElementById('fav-toggle-hero');
             if (heroWrap) {
                 heroWrap.innerHTML = '';
                 heroWrap.appendChild(_createFavButton(currentLocation, isFav, render));
             }
 
-            // Actions area
             var actionsWrap = document.getElementById('fav-toggle-actions');
             if (actionsWrap) {
                 actionsWrap.innerHTML = '';
                 actionsWrap.appendChild(_createFavButton(currentLocation, isFav, render));
             }
 
-            // Quick-switch bar
             var switchBar = document.getElementById('fav-switch-bar');
             var switchPills = document.getElementById('fav-switch-pills');
             if (switchBar && switchPills) {
@@ -430,14 +430,41 @@ var Clearcast = (function () {
 
         if (recentsSection && recentsList && recents.length > 0) {
             recentsList.innerHTML = '';
-            recents.forEach(function (loc) {
+            var extraItems = [];
+
+            recents.forEach(function (loc, i) {
                 var li = document.createElement('li');
                 var a = document.createElement('a');
                 a.href = '/weather?location=' + encodeURIComponent(loc);
                 a.textContent = loc;
                 li.appendChild(a);
+
+                if (i >= RECENTS_DEFAULT_VISIBLE) {
+                    li.className = 'recents-extra-item';
+                    li.style.display = 'none';
+                    extraItems.push(li);
+                }
+
                 recentsList.appendChild(li);
             });
+
+            if (extraItems.length > 0) {
+                var seeMoreLi = document.createElement('li');
+                seeMoreLi.className = 'recents-see-more-item';
+                var seeMoreBtn = document.createElement('button');
+                seeMoreBtn.type = 'button';
+                seeMoreBtn.className = 'see-more-btn';
+                seeMoreBtn.textContent = 'See ' + extraItems.length + ' more';
+                seeMoreBtn.addEventListener('click', function () {
+                    extraItems.forEach(function (el) {
+                        el.style.display = '';
+                    });
+                    seeMoreLi.style.display = 'none';
+                });
+                seeMoreLi.appendChild(seeMoreBtn);
+                recentsList.appendChild(seeMoreLi);
+            }
+
             recentsSection.style.display = '';
             hasContent = true;
         }
@@ -542,16 +569,13 @@ var Clearcast = (function () {
         });
         radarState.layers = layers;
 
-        // Show last past frame by default (= "Now")
         var startIdx = Math.max(0, past.length - 1);
         radarState.currentFrame = startIdx;
         _showRadarFrame(startIdx);
 
-        // Show controls
         var controls = document.getElementById('radar-controls');
         if (controls) controls.style.display = '';
 
-        // Set up slider
         var slider = document.getElementById('radar-slider');
         if (slider) {
             slider.max = frames.length - 1;
@@ -562,7 +586,6 @@ var Clearcast = (function () {
             });
         }
 
-        // Play button
         var playBtn = document.getElementById('radar-play');
         if (playBtn) {
             playBtn.addEventListener('click', function () {
@@ -574,7 +597,6 @@ var Clearcast = (function () {
             });
         }
 
-        // Quick buttons
         var quickBtns = document.querySelectorAll('.radar-quick-btn');
         quickBtns.forEach(function (btn) {
             btn.addEventListener('click', function () {
@@ -796,6 +818,8 @@ var Clearcast = (function () {
             warningBg: 'rgba(210, 153, 34, 0.1)',
             danger: '#f85149',
             dangerBg: 'rgba(248, 81, 73, 0.1)',
+            orange: '#f0883e',
+            orangeBg: 'rgba(240, 136, 62, 0.1)',
         };
     }
 
@@ -867,7 +891,7 @@ var Clearcast = (function () {
         });
     }
 
-    /* ─── Day detail charts ─── */
+    /* ─── Day detail charts (including Real Feel) ─── */
     function renderDayCharts(chartData) {
         if (typeof Chart === 'undefined' || !chartData || !chartData.length) return;
         var c = getChartColors();
@@ -904,6 +928,70 @@ var Clearcast = (function () {
                         }),
                     }),
                 }),
+            });
+        }
+
+        // Real Feel / Apparent Temperature
+        var apparentEl = document.getElementById('day-apparent-chart');
+        if (apparentEl) {
+            var apparentCanvas = document.createElement('canvas');
+            apparentEl.appendChild(apparentCanvas);
+
+            var hasApparentDiff = chartData.some(function (d) {
+                return d.apparent_temp !== null && d.apparent_temp !== d.temp;
+            });
+
+            var apparentOpts = Object.assign({}, baseOpts, {
+                plugins: Object.assign({}, baseOpts.plugins, {
+                    legend: {
+                        display: hasApparentDiff,
+                        labels: { color: c.text, font: { size: 11 }, usePointStyle: true, pointStyle: 'circle' }
+                    },
+                    tooltip: Object.assign({}, baseOpts.plugins.tooltip, {
+                        displayColors: true,
+                        callbacks: {
+                            label: function (ctx) {
+                                return ctx.dataset.label + ': ' + ctx.parsed.y + '\u00b0F';
+                            },
+                        },
+                    }),
+                }),
+            });
+
+            var apparentDatasets = [
+                {
+                    label: 'Feels Like',
+                    data: chartData.map(function (d) { return d.apparent_temp; }),
+                    borderColor: c.orange,
+                    backgroundColor: c.orangeBg,
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 3,
+                    borderWidth: 2,
+                }
+            ];
+
+            if (hasApparentDiff) {
+                apparentDatasets.unshift({
+                    label: 'Actual',
+                    data: chartData.map(function (d) { return d.temp; }),
+                    borderColor: c.accent,
+                    backgroundColor: 'transparent',
+                    borderDash: [5, 3],
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    tension: 0.4,
+                    fill: false,
+                });
+            }
+
+            new Chart(apparentCanvas, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: apparentDatasets,
+                },
+                options: apparentOpts,
             });
         }
 

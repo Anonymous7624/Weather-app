@@ -13,7 +13,7 @@
         </a>
         <div class="day-detail-title-row">
             <span style="font-size: 3rem; display: block; margin-bottom: 0.5rem;">{{ day.icon }}</span>
-            <h1 class="day-detail-title">{{ day.name }}</h1>
+            <h1 class="day-detail-title">{{ day.name }}{% if is_today %} — Today{% endif %}</h1>
         </div>
         {% if day_date %}
         <p class="day-detail-subtitle">{{ day_date }}</p>
@@ -37,16 +37,34 @@
 
     <!-- Summary Cards -->
     <div class="day-summary-grid reveal reveal-delay-1">
+        {% if day.high != '—' %}
         <div class="day-summary-card">
             <div class="day-summary-card-icon">&#127777;&#65039;</div>
             <div class="day-summary-card-label">High</div>
             <div class="day-summary-card-value">{{ day.high }}</div>
         </div>
+        {% endif %}
+        {% if day.low != '—' %}
         <div class="day-summary-card">
             <div class="day-summary-card-icon">&#10052;&#65039;</div>
             <div class="day-summary-card-label">Low</div>
             <div class="day-summary-card-value">{{ day.low }}</div>
         </div>
+        {% endif %}
+        {% if day.apparent_high is defined and day.apparent_high != '—' and day.apparent_high != day.high %}
+        <div class="day-summary-card">
+            <div class="day-summary-card-icon">&#127777;&#65039;</div>
+            <div class="day-summary-card-label">Feels Like High</div>
+            <div class="day-summary-card-value">{{ day.apparent_high }}</div>
+        </div>
+        {% endif %}
+        {% if day.apparent_low is defined and day.apparent_low != '—' and day.apparent_low != day.low %}
+        <div class="day-summary-card">
+            <div class="day-summary-card-icon">&#10052;&#65039;</div>
+            <div class="day-summary-card-label">Feels Like Low</div>
+            <div class="day-summary-card-value">{{ day.apparent_low }}</div>
+        </div>
+        {% endif %}
         <div class="day-summary-card">
             <div class="day-summary-card-icon">&#128167;</div>
             <div class="day-summary-card-label">Precip</div>
@@ -85,10 +103,16 @@
     <!-- Tab: Overview -->
     <div class="detail-tab-panel active reveal reveal-delay-3" data-tab-panel="overview" role="tabpanel">
         <div class="forecast-narrative">
-            <h3>&#9729; Daytime Forecast</h3>
+            {% if is_today and weather.current.summary %}
+            <h3>&#9729; Current Conditions</h3>
+            <p>{{ weather.current.summary }}</p>
+            {% endif %}
+
             {% if day.detailed_forecast %}
+            <h3{% if is_today and weather.current.summary %} style="margin-top: 1.25rem;"{% endif %}>&#9729; Daytime Forecast</h3>
             <p>{{ day.detailed_forecast }}</p>
-            {% else %}
+            {% elif day.summary %}
+            <h3>&#9729; Forecast</h3>
             <p>{{ day.summary }}</p>
             {% endif %}
 
@@ -108,6 +132,9 @@
                 <div class="day-hourly-time">{{ h.time }}</div>
                 <div class="day-hourly-icon">{{ h.icon }}</div>
                 <div class="day-hourly-temp">{{ h.temp }}</div>
+                {% if h.apparent_temp_value is not none and h.apparent_temp_value != h.temp_value %}
+                <div class="day-hourly-feels">Feels {{ h.apparent_temp }}</div>
+                {% endif %}
                 <div class="day-hourly-desc">{{ h.short_forecast }}</div>
                 <div class="day-hourly-meta">
                     &#128167; {{ h.precip }}<br>
@@ -133,6 +160,10 @@
                 <div class="chart-container" id="day-temp-chart"></div>
             </div>
             <div class="chart-card">
+                <h4>&#127777;&#65039; Real Feel</h4>
+                <div class="chart-container" id="day-apparent-chart"></div>
+            </div>
+            <div class="chart-card">
                 <h4>&#128167; Precipitation Chance</h4>
                 <div class="chart-container" id="day-precip-chart"></div>
             </div>
@@ -156,14 +187,30 @@
     <!-- Tab: Conditions -->
     <div class="detail-tab-panel" data-tab-panel="conditions" role="tabpanel">
         <div class="day-summary-grid" style="max-width: 600px;">
+            {% if day.high != '—' %}
             <div class="day-summary-card">
                 <div class="day-summary-card-label">High Temperature</div>
                 <div class="day-summary-card-value">{{ day.high }}</div>
             </div>
+            {% endif %}
+            {% if day.low != '—' %}
             <div class="day-summary-card">
                 <div class="day-summary-card-label">Low Temperature</div>
                 <div class="day-summary-card-value">{{ day.low }}</div>
             </div>
+            {% endif %}
+            {% if day.apparent_high is defined and day.apparent_high != '—' %}
+            <div class="day-summary-card">
+                <div class="day-summary-card-label">Feels Like High</div>
+                <div class="day-summary-card-value">{{ day.apparent_high }}</div>
+            </div>
+            {% endif %}
+            {% if day.apparent_low is defined and day.apparent_low != '—' %}
+            <div class="day-summary-card">
+                <div class="day-summary-card-label">Feels Like Low</div>
+                <div class="day-summary-card-value">{{ day.apparent_low }}</div>
+            </div>
+            {% endif %}
             <div class="day-summary-card">
                 <div class="day-summary-card-label">Precipitation</div>
                 <div class="day-summary-card-value">{{ day.precip_chance }}</div>
@@ -182,6 +229,34 @@
                 <div class="day-summary-card-label">Sky</div>
                 <div class="day-summary-card-value" style="font-size: 0.9rem;">{{ day.summary }}</div>
             </div>
+            {% if is_today %}
+            <div class="day-summary-card">
+                <div class="day-summary-card-label">Sunrise</div>
+                <div class="day-summary-card-value">{{ weather.details.sunrise }}</div>
+            </div>
+            <div class="day-summary-card">
+                <div class="day-summary-card-label">Sunset</div>
+                <div class="day-summary-card-value">{{ weather.details.sunset }}</div>
+            </div>
+            {% if weather.details.humidity and weather.details.humidity != '—' %}
+            <div class="day-summary-card">
+                <div class="day-summary-card-label">Humidity</div>
+                <div class="day-summary-card-value">{{ weather.details.humidity }}</div>
+            </div>
+            {% endif %}
+            {% if weather.details.pressure and weather.details.pressure != '—' %}
+            <div class="day-summary-card">
+                <div class="day-summary-card-label">Pressure</div>
+                <div class="day-summary-card-value">{{ weather.details.pressure }}</div>
+            </div>
+            {% endif %}
+            {% if weather.details.visibility and weather.details.visibility != '—' %}
+            <div class="day-summary-card">
+                <div class="day-summary-card-label">Visibility</div>
+                <div class="day-summary-card-value">{{ weather.details.visibility }}</div>
+            </div>
+            {% endif %}
+            {% endif %}
         </div>
     </div>
 

@@ -157,7 +157,7 @@ def weather():
 
 @app.route("/weather/day/<int:day_index>")
 def weather_day(day_index):
-    """Dedicated day detail page."""
+    """Dedicated day detail page. day_index=0 is always today."""
     location_input = request.args.get("location", "").strip()
     if not location_input:
         return redirect(url_for("index"))
@@ -175,6 +175,8 @@ def weather_day(day_index):
     day_chart = _filter_chart_for_day(weather_data, day)
     day_date = _format_day_date(day.get("raw_start_time"))
 
+    is_today = day_index == 0
+
     prev_index = day_index - 1 if day_index > 0 else None
     next_index = day_index + 1 if day_index < len(daily) - 1 else None
 
@@ -190,7 +192,32 @@ def weather_day(day_index):
         total_days=len(daily),
         prev_index=prev_index,
         next_index=next_index,
+        is_today=is_today,
     )
+
+
+# TODO: Historical weather endpoint placeholder.
+#
+# The NWS observations API supports historical queries:
+#   GET /stations/{stationId}/observations?start={ISO}&end={ISO}
+#
+# A future /api/history?location=...&days=3 endpoint could:
+#   1. Resolve location → station ID (already done in nws.py)
+#   2. Fetch 72 hours of observations
+#   3. Aggregate into daily summaries (high, low, conditions, precip)
+#   4. Return JSON for client-side rendering
+#
+# This is deferred because the current NWS API flow only fetches the
+# latest observation. Adding reliable aggregation of raw hourly
+# observations into daily summaries requires careful handling of
+# missing data and varying station reporting intervals.
+#
+# @app.route("/api/history")
+# def weather_history():
+#     location_input = request.args.get("location", "").strip()
+#     days = min(int(request.args.get("days", 3)), 7)
+#     # ... resolve location, fetch observations, aggregate, return JSON
+#     pass
 
 
 @app.route("/api/geocode-suggest")
