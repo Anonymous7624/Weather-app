@@ -240,6 +240,70 @@ def _format_cloud_layers(layers):
     return ", ".join(parts) if parts else "\u2014"
 
 
+def calc_apparent_temp(temp_f, wind_mph=None, humidity=None):
+    """Calculate apparent (feels-like) temperature in Fahrenheit.
+
+    Uses the NWS Wind Chill formula when T <= 50 degF and wind >= 3 mph,
+    and the NOAA/Rothfusz Heat Index regression when T >= 80 degF.
+    Between 50-80 degF the apparent temperature equals the air temperature.
+
+    Returns integer degF or None if temp_f is None.
+    """
+    if temp_f is None:
+        return None
+    try:
+        t = float(temp_f)
+    except (TypeError, ValueError):
+        return None
+
+    w = 0.0
+    if wind_mph is not None:
+        try:
+            w = max(0.0, float(wind_mph))
+        except (TypeError, ValueError):
+            w = 0.0
+
+    if t <= 50 and w >= 3:
+        wc = (35.74 + 0.6215 * t
+              - 35.75 * (w ** 0.16)
+              + 0.4275 * t * (w ** 0.16))
+        return round(wc)
+
+    rh = None
+    if humidity is not None:
+        try:
+            rh = float(humidity)
+        except (TypeError, ValueError):
+            rh = None
+
+    if t >= 80 and rh is not None:
+        hi_simple = 0.5 * (t + 61.0 + (t - 68.0) * 1.2 + rh * 0.094)
+        if (hi_simple + t) / 2.0 >= 80:
+            hi = (-42.379
+                  + 2.04901523 * t
+                  + 10.14333127 * rh
+                  - 0.22475541 * t * rh
+                  - 0.00683783 * t * t
+                  - 0.05481717 * rh * rh
+                  + 0.00122874 * t * t * rh
+                  + 0.00085282 * t * rh * rh
+                  - 0.00000199 * t * t * rh * rh)
+            if rh < 13 and 80 <= t <= 112:
+                hi -= ((13 - rh) / 4.0) * ((17 - abs(t - 95.0)) / 17.0) ** 0.5
+            if rh > 85 and 80 <= t <= 87:
+                hi += ((rh - 85) / 10.0) * ((87 - t) / 5.0)
+            return round(max(hi, t))
+        return round(max(hi_simple, t))
+
+    return round(t)
+
+
+def _is_night_period(name):
+    """Return True if the NWS period name represents nighttime."""
+    n = (name or "").lower()
+    return "night" in n or "evening" in n or "overnight" in n
+
+
 def normalize_weather_data(display_name, forecast, hourly, alerts_data,
                           observations_data=None, grid_data=None, lat=None, lon=None,
                           station_name=None, station_id=None):
@@ -270,12 +334,16 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
     # --- Current conditions from observations ---
     current = {
         "temp": "\u2014",
+        "temp_value": None,
         "feels_like": "\u2014",
+        "feels_like_value": None,
         "wind": "\u2014",
         "wind_speed": "\u2014",
+        "wind_speed_value": None,
         "wind_direction": "\u2014",
         "wind_gust": "\u2014",
         "humidity": "\u2014",
+        "humidity_value": None,
         "precipitation": "\u2014",
         "summary": "",
         "short_forecast": "",
@@ -294,14 +362,13 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
         obs = observations_data["features"][0]
         obs_props = obs.get("properties", {})
 
-        # Temperature (observations are in Celsius)
         temp_c = _obs_value(obs_props, "temperature")
         if temp_c is not None:
             t_f = _c_to_f(temp_c)
             if t_f is not None:
                 current["temp"] = f"{t_f}\u00b0F"
+                current["temp_value"] = t_f
 
-        # Wind speed (observations use metric units)
         wind_speed_raw = _obs_value(obs_props, "windSpeed")
         wind_unit = _obs_unit(obs_props, "windSpeed")
         wind_dir_raw = _obs_value(obs_props, "windDirection")
@@ -310,6 +377,7 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
             mph = _wind_obs_to_mph(wind_speed_raw, wind_unit)
             if mph is not None:
                 current["wind_speed"] = f"{mph} mph"
+                current["wind_speed_value"] = mph
 
         if wind_dir_raw is not None:
             try:
@@ -329,7 +397,6 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
                 parts.append(f"at {current['wind_speed']}")
             current["wind"] = " ".join(parts)
 
-        # Wind gust
         gust_raw = _obs_value(obs_props, "windGust")
         gust_unit = _obs_unit(obs_props, "windGust") or wind_unit
         if gust_raw is not None:
@@ -337,22 +404,21 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
             if mph is not None:
                 current["wind_gust"] = f"{mph} mph"
 
-        # Humidity
         rh = _obs_value(obs_props, "relativeHumidity")
         if rh is not None:
             try:
-                current["humidity"] = f"{int(float(rh))}%"
+                rh_int = int(float(rh))
+                current["humidity"] = f"{rh_int}%"
+                current["humidity_value"] = rh_int
             except (TypeError, ValueError):
                 pass
 
-        # Dew point (Celsius)
         dew_c = _obs_value(obs_props, "dewpoint")
         if dew_c is not None:
             d_f = _c_to_f(dew_c)
             if d_f is not None:
                 current["dew_point"] = f"{d_f}\u00b0F"
 
-        # Visibility (meters)
         vis = _obs_value(obs_props, "visibility")
         if vis is not None:
             try:
@@ -365,7 +431,6 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
             except (TypeError, ValueError):
                 pass
 
-        # Barometric pressure (Pascals)
         pressure = _obs_value(obs_props, "barometricPressure")
         if pressure is not None:
             try:
@@ -375,7 +440,6 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
             except (TypeError, ValueError):
                 pass
 
-        # Feels like: wind chill or heat index
         feels = _obs_value(obs_props, "windChill")
         if feels is None:
             feels = _obs_value(obs_props, "heatIndex")
@@ -383,22 +447,31 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
             f_f = _c_to_f(feels)
             if f_f is not None:
                 current["feels_like"] = f"{f_f}\u00b0F"
+                current["feels_like_value"] = f_f
 
-        # Cloud cover
         cloud_layers = obs_props.get("cloudLayers")
         if cloud_layers:
             current["cloud_cover"] = _format_cloud_layers(cloud_layers)
 
-        # Text description from observation
         text_desc = obs_props.get("textDescription")
         if text_desc:
             current["text_description"] = text_desc
 
-        # Timestamp
         ts = obs_props.get("timestamp")
         if ts:
             current["last_updated"] = _format_obs_time(ts)
             current["last_updated_full"] = _format_obs_datetime(ts)
+
+    # If observation didn't provide feels_like, compute from observation data
+    if current["feels_like_value"] is None and current["temp_value"] is not None:
+        computed = calc_apparent_temp(
+            current["temp_value"],
+            current.get("wind_speed_value"),
+            current.get("humidity_value"),
+        )
+        if computed is not None:
+            current["feels_like"] = f"{computed}\u00b0F"
+            current["feels_like_value"] = computed
 
     # --- Periods (extended forecast) ---
     periods = []
@@ -437,6 +510,12 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
             humidity_raw = p.get("relativeHumidity")
             humidity_val = _extract_number(humidity_raw)
 
+            apparent = calc_apparent_temp(
+                temp_value,
+                wind_speed_val,
+                int(humidity_val) if humidity_val is not None else None,
+            )
+
             periods.append({
                 "name": name,
                 "temp": temp,
@@ -456,11 +535,15 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
                 "icon": weather_icon(short),
                 "wind_direction": p.get("windDirection"),
                 "index": len(periods),
+                "apparent_temp": f"{apparent}\u00b0F" if apparent is not None else "\u2014",
+                "apparent_temp_value": apparent,
+                "is_daytime": p.get("isDaytime", not _is_night_period(name)),
             })
 
             if (is_today or current["temp"] == "\u2014") and temp != "\u2014":
                 if current["temp"] == "\u2014":
                     current["temp"] = temp
+                    current["temp_value"] = temp_value
                 if current["wind"] == "\u2014":
                     current["wind"] = wind
                 current["short_forecast"] = short or current["short_forecast"]
@@ -468,7 +551,11 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
                 if current["precipitation"] == "\u2014":
                     current["precipitation"] = precip
                 if current["feels_like"] == "\u2014":
-                    current["feels_like"] = temp
+                    if apparent is not None:
+                        current["feels_like"] = f"{apparent}\u00b0F"
+                        current["feels_like_value"] = apparent
+                    else:
+                        current["feels_like"] = temp
 
     # --- Hourly forecast ---
     hourly_cards = []
@@ -498,6 +585,12 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
             wind_speed_val = _parse_wind_speed_mph(hp.get("windSpeed"))
             humidity_val = _extract_number(hp.get("relativeHumidity"))
 
+            apparent = calc_apparent_temp(
+                temp_f,
+                wind_speed_val,
+                int(humidity_val) if humidity_val is not None else None,
+            )
+
             hourly_cards.append({
                 "time": time_str,
                 "temp": temp,
@@ -511,6 +604,8 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
                 "icon": weather_icon(short),
                 "detailed_forecast": _safe(hp.get("detailedForecast", "")),
                 "start_time": start,
+                "apparent_temp": f"{apparent}\u00b0F" if apparent is not None else "\u2014",
+                "apparent_temp_value": apparent,
             })
 
     # --- Chart data from hourly forecast ---
@@ -530,6 +625,12 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
             wind_speed_val = _parse_wind_speed_mph(hp.get("windSpeed"))
             humidity_val = _extract_number(hp.get("relativeHumidity"))
 
+            apparent = calc_apparent_temp(
+                temp_f,
+                wind_speed_val,
+                int(humidity_val) if humidity_val is not None else None,
+            )
+
             chart_hourly.append({
                 "time": _short_time(hp.get("startTime", "")),
                 "raw_start_time": hp.get("startTime", ""),
@@ -537,6 +638,7 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
                 "precip": int(precip_val) if precip_val is not None else None,
                 "wind": wind_speed_val,
                 "humidity": int(humidity_val) if humidity_val is not None else None,
+                "apparent_temp": apparent,
             })
 
     current["icon"] = weather_icon(current.get("short_forecast", ""))
@@ -544,10 +646,23 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
     if current["temp"] == "\u2014" and hourly_cards:
         h0 = hourly_cards[0]
         current["temp"] = h0["temp"]
+        current["temp_value"] = h0["temp_value"]
         current["wind"] = h0["wind"]
         current["short_forecast"] = h0["short_forecast"]
     if current["feels_like"] == "\u2014" and current["temp"] != "\u2014":
-        current["feels_like"] = current["temp"]
+        if current.get("temp_value") is not None:
+            computed = calc_apparent_temp(
+                current["temp_value"],
+                current.get("wind_speed_value"),
+                current.get("humidity_value"),
+            )
+            if computed is not None:
+                current["feels_like"] = f"{computed}\u00b0F"
+                current["feels_like_value"] = computed
+            else:
+                current["feels_like"] = current["temp"]
+        else:
+            current["feels_like"] = current["temp"]
 
     # --- Details section ---
     details = {
@@ -596,35 +711,98 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
 
 
 def _build_daily_forecast(periods):
-    """Build 7-day daily forecast from period pairs (day + night)."""
+    """Build 7-day daily forecast from period pairs (day + night).
+
+    Ensures day_index=0 always represents today, even when the first
+    NWS period is a night period (e.g. "Tonight" for evening requests).
+    """
     daily = []
     i = 0
+
+    if periods:
+        first_name = periods[0].get("name", "")
+        if _is_night_period(first_name):
+            p = periods[0]
+            low_val = p.get("temp_value")
+            apparent_low = calc_apparent_temp(
+                low_val, p.get("wind_speed_value"), p.get("humidity_value"),
+            )
+            daily.append({
+                "name": "Today",
+                "high": "\u2014",
+                "low": p.get("temp", "\u2014"),
+                "summary": p.get("short_forecast", ""),
+                "precip_chance": p.get("precip_chance", "\u2014"),
+                "icon": p.get("icon", "\U0001f324"),
+                "detailed_forecast": "",
+                "night_detailed_forecast": p.get("detailed_forecast", ""),
+                "wind": p.get("wind", "\u2014"),
+                "wind_direction": p.get("wind_direction", ""),
+                "temp_value": None,
+                "low_value": low_val,
+                "precip_value": p.get("precip_value"),
+                "wind_speed_value": p.get("wind_speed_value"),
+                "humidity_value": p.get("humidity_value"),
+                "apparent_high": "\u2014",
+                "apparent_high_value": None,
+                "apparent_low": f"{apparent_low}\u00b0F" if apparent_low is not None else "\u2014",
+                "apparent_low_value": apparent_low,
+                "period_index": 0,
+                "raw_start_time": p.get("raw_start_time", ""),
+                "day_index": 0,
+            })
+            i = 1
+
     while i < len(periods) and len(daily) < 7:
         p = periods[i]
         name = (p.get("name") or "").lower()
-        is_night = "night" in name or "tonight" in name
+        is_night = _is_night_period(name)
+
         if is_night:
             if daily:
                 daily[-1]["low"] = p.get("temp", "\u2014")
+                daily[-1]["low_value"] = p.get("temp_value")
                 if not daily[-1].get("night_detailed_forecast"):
                     daily[-1]["night_detailed_forecast"] = p.get("detailed_forecast", "")
+                night_apparent = calc_apparent_temp(
+                    p.get("temp_value"),
+                    p.get("wind_speed_value"),
+                    p.get("humidity_value"),
+                )
+                daily[-1]["apparent_low"] = (
+                    f"{night_apparent}\u00b0F" if night_apparent is not None else "\u2014"
+                )
+                daily[-1]["apparent_low_value"] = night_apparent
             i += 1
             continue
 
         day_period_index = i
         high = p.get("temp", "\u2014")
+        high_val = p.get("temp_value")
         low = "\u2014"
+        low_val = None
         summary = p.get("short_forecast", "")
         precip = p.get("precip_chance", "\u2014")
         icon = p.get("icon", "\U0001f324")
         night_detailed = ""
 
+        apparent_high = calc_apparent_temp(
+            high_val, p.get("wind_speed_value"), p.get("humidity_value"),
+        )
+        apparent_low = None
+
         if i + 1 < len(periods):
             pn = periods[i + 1]
             nn = (pn.get("name") or "").lower()
-            if "night" in nn or "tonight" in nn:
+            if _is_night_period(nn):
                 low = pn.get("temp", "\u2014")
+                low_val = pn.get("temp_value")
                 night_detailed = pn.get("detailed_forecast", "")
+                apparent_low = calc_apparent_temp(
+                    low_val,
+                    pn.get("wind_speed_value"),
+                    pn.get("humidity_value"),
+                )
                 if not summary and pn.get("short_forecast"):
                     summary = pn.get("short_forecast", "")
                 if precip == "\u2014" and pn.get("precip_chance"):
@@ -646,10 +824,15 @@ def _build_daily_forecast(periods):
             "night_detailed_forecast": night_detailed,
             "wind": p.get("wind", "\u2014"),
             "wind_direction": p.get("wind_direction", ""),
-            "temp_value": p.get("temp_value"),
+            "temp_value": high_val,
+            "low_value": low_val,
             "precip_value": p.get("precip_value"),
             "wind_speed_value": p.get("wind_speed_value"),
             "humidity_value": p.get("humidity_value"),
+            "apparent_high": f"{apparent_high}\u00b0F" if apparent_high is not None else "\u2014",
+            "apparent_high_value": apparent_high,
+            "apparent_low": f"{apparent_low}\u00b0F" if apparent_low is not None else "\u2014",
+            "apparent_low_value": apparent_low,
             "period_index": day_period_index,
             "raw_start_time": p.get("raw_start_time", ""),
             "day_index": len(daily),
@@ -685,3 +868,38 @@ def _compute_best_time(periods, hourly):
     if best[0] <= 0:
         return "Conditions may be variable. Check the hourly forecast."
     return f"{best[1]}: {best[3]} ({best[2]}) \u2014 Good time to go outside."
+
+
+# TODO: Historical weather data placeholder.
+#
+# The NWS observations API supports querying past observations:
+#   GET /stations/{stationId}/observations?start={ISO8601}&end={ISO8601}
+#
+# To implement "Past 3 Days" section:
+#   1. Fetch observations for the past 72 hours from the nearest station.
+#   2. Aggregate hourly observations into daily summaries:
+#      - observed high / low temperatures
+#      - dominant conditions (most frequent textDescription)
+#      - total precipitation (precipitationLastHour values)
+#      - average humidity, wind, pressure
+#   3. Return a list of daily dicts similar to the daily forecast format.
+#
+# This is NOT currently implemented because:
+#   - The current data flow only fetches limit=1 (latest observation)
+#   - Aggregating raw observations into reliable daily summaries requires
+#     handling missing data, station outages, and varying report intervals
+#   - Quality varies significantly by station
+#
+# Future implementation:
+#   def fetch_historical_observations(station_id, days=3):
+#       from datetime import datetime, timedelta, timezone
+#       end = datetime.now(timezone.utc)
+#       start = end - timedelta(days=days)
+#       url = f"{NWS_BASE}/stations/{station_id}/observations"
+#       params = {"start": start.isoformat(), "end": end.isoformat()}
+#       data = _get(url, params=params)
+#       return _aggregate_daily_observations(data)
+#
+#   def _aggregate_daily_observations(obs_data):
+#       """Group observations by date, compute high/low/conditions per day."""
+#       pass  # implement aggregation logic

@@ -67,7 +67,12 @@
 
     <!-- Current Conditions -->
     <section id="current" class="dashboard-section reveal" data-section="current">
-        <h2 class="section-title"><span class="section-title-icon">&#127780;</span> Current Conditions</h2>
+        <h2 class="section-title">
+            <span class="section-title-icon">&#127780;</span> Current Conditions
+            {% if weather.daily %}
+            <a href="{{ url_for('weather_day', day_index=0, location=location_input) }}" class="section-detail-link">View today's full forecast &rarr;</a>
+            {% endif %}
+        </h2>
         <div class="current-grid">
             <div class="current-main-card">
                 <div class="current-main">
@@ -89,7 +94,12 @@
                         {% endif %}
                     </ul>
                 </div>
-                <button type="button" class="current-expand-btn" aria-expanded="false" data-expand-target="current-details">More info</button>
+                <div class="current-card-actions">
+                    <button type="button" class="current-expand-btn" aria-expanded="false" data-expand-target="current-details">More info</button>
+                    {% if weather.daily %}
+                    <a href="{{ url_for('weather_day', day_index=0, location=location_input) }}" class="current-today-link">Today's charts &amp; details &rarr;</a>
+                    {% endif %}
+                </div>
                 <div id="current-details" class="details-expandable expandable" hidden>
                     {% if weather.details.station_name or weather.details.station_id %}
                     <div class="observation-source">
@@ -182,7 +192,12 @@
     <!-- Hourly Forecast -->
     {% if weather.hourly %}
     <section id="hourly" class="dashboard-section reveal" data-section="hourly">
-        <h2 class="section-title"><span class="section-title-icon">&#128200;</span> Next 24 Hours</h2>
+        <h2 class="section-title">
+            <span class="section-title-icon">&#128200;</span> Next 24 Hours
+            {% if weather.daily %}
+            <a href="{{ url_for('weather_day', day_index=0, location=location_input) }}" class="section-detail-link">Full day view &rarr;</a>
+            {% endif %}
+        </h2>
         <div class="hourly-scroll">
             {% for h in weather.hourly[:24] %}
             <div class="hourly-card" data-index="{{ loop.index0 }}" data-temp="{{ h.temp_value|default('') }}" data-precip="{{ h.precip_value|default('') }}"
@@ -191,12 +206,18 @@
                     {% if h.icon %}<span class="hourly-icon">{{ h.icon }}</span>{% endif %}
                     <span class="hourly-time">{{ h.time }}</span>
                     <span class="hourly-temp">{{ h.temp }}</span>
+                    {% if h.apparent_temp_value is not none and h.apparent_temp_value != h.temp_value %}
+                    <span class="hourly-feels">Feels {{ h.apparent_temp }}</span>
+                    {% endif %}
                     <span class="hourly-precip">&#128167; {{ h.precip }}</span>
                     <span class="hourly-desc">{{ h.short_forecast }}</span>
                 </button>
                 <div class="hourly-expandable expandable" hidden>
                     <div class="hourly-detail">
                         <p class="hourly-wind"><strong>Wind:</strong> {{ h.wind }}</p>
+                        {% if h.apparent_temp and h.apparent_temp != '—' and h.apparent_temp != h.temp %}
+                        <p class="hourly-feels-detail"><strong>Feels Like:</strong> {{ h.apparent_temp }}</p>
+                        {% endif %}
                         {% if h.detailed_forecast %}<p>{{ h.detailed_forecast }}</p>{% endif %}
                         <div class="hourly-chart-placeholder" data-index="{{ loop.index0 }}"></div>
                     </div>
@@ -213,7 +234,7 @@
         <h2 class="section-title"><span class="section-title-icon">&#128197;</span> 7-Day Forecast</h2>
         <div class="daily-grid">
             {% for d in weather.daily %}
-            <div class="daily-card {% if 'Today' in d.name %}highlight-today{% endif %}">
+            <div class="daily-card {% if d.day_index == 0 %}highlight-today{% endif %}">
                 <a href="{{ url_for('weather_day', day_index=d.day_index, location=location_input) }}" class="daily-card-link">
                     <span class="daily-icon">{{ d.icon }}</span>
                     <h3 class="daily-name">{{ d.name }}</h3>
@@ -221,6 +242,20 @@
                         <span class="daily-high">{{ d.high }}</span>
                         <span class="daily-low">{{ d.low }}</span>
                     </div>
+                    {% if d.apparent_high != '—' and d.apparent_high != d.high %}
+                    <div class="daily-feels-row">
+                        <span class="daily-feels-label">Feels</span>
+                        <span class="daily-feels-value">{{ d.apparent_high }}</span>
+                        {% if d.apparent_low != '—' %}
+                        <span class="daily-feels-low">{{ d.apparent_low }}</span>
+                        {% endif %}
+                    </div>
+                    {% elif d.apparent_low != '—' and d.apparent_low != d.low %}
+                    <div class="daily-feels-row">
+                        <span class="daily-feels-label">Feels</span>
+                        <span class="daily-feels-value">{{ d.apparent_low }}</span>
+                    </div>
+                    {% endif %}
                     <p class="daily-summary">{{ d.summary }}</p>
                     <span class="daily-precip">&#128167; {{ d.precip_chance }}</span>
                     <span class="daily-view-hint">View details &rarr;</span>
@@ -238,6 +273,9 @@
                 {% if p.icon %}<span class="period-icon">{{ p.icon }}</span>{% endif %}
                 <h3 class="period-name">{{ p.name }}</h3>
                 <span class="period-temp">{{ p.temp }}</span>
+                {% if p.apparent_temp and p.apparent_temp != '—' and p.apparent_temp != p.temp %}
+                <span class="period-feels">Feels {{ p.apparent_temp }}</span>
+                {% endif %}
                 <p class="period-short">{{ p.short_forecast }}</p>
                 <ul class="period-meta">
                     <li>Wind: {{ p.wind }}</li>
@@ -282,6 +320,21 @@
         </div>
     </section>
     {% endif %}
+
+    <!-- Past 3 Days — placeholder for future historical data support.
+         The NWS observations API can provide past station data via
+         /stations/{id}/observations?start=...&end=...
+         but this is not yet implemented. See TODO in utils/normalize.py
+         and app.py for the planned approach.
+    -->
+    <!--
+    <section id="history" class="dashboard-section reveal" data-section="history">
+        <h2 class="section-title"><span class="section-title-icon">&#128197;</span> Past 3 Days <span class="section-badge">Observed</span></h2>
+        <div id="history-container" class="history-grid">
+            (historical daily cards would render here via JS or server)
+        </div>
+    </section>
+    -->
 
     <!-- Actions -->
     <div class="dashboard-actions reveal">
