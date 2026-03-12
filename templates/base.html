@@ -25,7 +25,7 @@
                 <form class="nav-search-form" action="{{ url_for('weather') }}" method="get" role="search">
                     <div class="search-wrap">
                         <input type="text" name="location" placeholder="Search location&hellip;"
-                               value="{{ location_input|default('', true) }}" autocomplete="off"
+                               value="{{ nav_search_value if nav_search_value is defined else (location_input|default('', true)) }}" autocomplete="off"
                                class="nav-search-input" id="header-search-input"
                                aria-label="Search location" aria-autocomplete="list"
                                aria-controls="search-suggestions" aria-expanded="false">
@@ -44,10 +44,19 @@
     </nav>
 
     <div id="loading-overlay" class="loading-overlay hidden">
-        <div class="loading-content">
+        <div class="loading-content loading-state" id="loading-content">
             <div class="loading-spinner"></div>
             <p class="loading-text">Loading forecast&hellip;</p>
             <p class="loading-subtext">Fetching data from the National Weather Service</p>
+            <div class="loading-fallback hidden" id="loading-fallback">
+                <p class="loading-fallback-text">Taking a while?</p>
+                <a href="{{ url_for('index') }}" class="btn btn-outline btn-sm">Search manually</a>
+            </div>
+        </div>
+        <div class="loading-error loading-error-state hidden" id="loading-error">
+            <span class="loading-error-icon" aria-hidden="true">&#9888;</span>
+            <p class="loading-error-text" id="loading-error-text"></p>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary loading-error-btn">Search manually</a>
         </div>
     </div>
 

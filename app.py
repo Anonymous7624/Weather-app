@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from utils.config import get_default_location
-from utils.geocode import resolve_location, suggest_locations
+from utils.geocode import resolve_location, suggest_locations, is_coord_input
 from utils.nws import fetch_weather_data
 from utils.cache import get_cached_weather, set_cached_weather
 
@@ -163,10 +163,12 @@ def weather():
                 location_input=loc,
             ), 502
 
+    nav_search_value = "" if is_coord_input(location_input) else location_input
     resp = make_response(render_template(
         "dashboard.html",
         weather=weather_data,
         location_input=location_input,
+        nav_search_value=nav_search_value,
         chart_hourly=weather_data.get("chart_hourly", []),
     ))
     resp.set_cookie(COOKIE_LAST_LOCATION, location_input, max_age=COOKIE_MAX_AGE, samesite="Lax")
@@ -198,6 +200,7 @@ def weather_day(day_index):
     prev_index = day_index - 1 if day_index > 0 else None
     next_index = day_index + 1 if day_index < len(daily) - 1 else None
 
+    nav_search_value = "" if is_coord_input(location_input) else location_input
     return render_template(
         "day_detail.html",
         weather=weather_data,
@@ -207,6 +210,7 @@ def weather_day(day_index):
         day_hourly=day_hourly,
         day_chart=day_chart,
         location_input=location_input,
+        nav_search_value=nav_search_value,
         total_days=len(daily),
         prev_index=prev_index,
         next_index=next_index,

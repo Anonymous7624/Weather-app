@@ -18,13 +18,57 @@ var Clearcast = (function () {
     var RECENTS_DEFAULT_VISIBLE = 3;
 
     /* ─── Loading overlay ─── */
-    function showLoading(text) {
+    function showLoading(text, subtext) {
         var el = document.getElementById(loadingId);
         if (el) {
             el.classList.remove('hidden');
+            var loadingState = el.querySelector('#loading-content');
+            var errorState = el.querySelector('#loading-error');
+            if (loadingState) {
+                loadingState.classList.remove('hidden');
+                loadingState.style.display = '';
+            }
+            if (errorState) {
+                errorState.classList.add('hidden');
+                errorState.style.display = 'none';
+            }
             var textEl = el.querySelector('.loading-text');
             if (textEl && text) {
                 textEl.textContent = text;
+            }
+            var subtextEl = el.querySelector('.loading-subtext');
+            if (subtextEl) {
+                subtextEl.textContent = subtext || '';
+                subtextEl.style.display = subtext ? '' : 'none';
+            }
+            var fallbackEl = el.querySelector('#loading-fallback');
+            if (fallbackEl) fallbackEl.classList.add('hidden');
+        }
+    }
+
+    function showLoadingFallback() {
+        var el = document.getElementById(loadingId);
+        if (el) {
+            var fallbackEl = el.querySelector('#loading-fallback');
+            if (fallbackEl) fallbackEl.classList.remove('hidden');
+        }
+    }
+
+    function showLoadingError(msg) {
+        var el = document.getElementById(loadingId);
+        if (el) {
+            el.classList.remove('hidden');
+            var loadingState = el.querySelector('#loading-content');
+            var errorState = el.querySelector('#loading-error');
+            if (loadingState) {
+                loadingState.classList.add('hidden');
+                loadingState.style.display = 'none';
+            }
+            if (errorState) {
+                var textEl = errorState.querySelector('.loading-error-text');
+                if (textEl) textEl.textContent = msg;
+                errorState.classList.remove('hidden');
+                errorState.style.display = '';
             }
         }
     }
@@ -265,25 +309,44 @@ var Clearcast = (function () {
         document.querySelectorAll(selector).forEach(function (btn) {
             btn.addEventListener('click', function () {
                 if (!navigator.geolocation) {
-                    alert('Geolocation is not supported by your browser.');
+                    showLoadingError('Geolocation is not supported by your browser.');
                     return;
                 }
                 btn.disabled = true;
                 var origHTML = btn.innerHTML;
                 btn.textContent = 'Locating\u2026';
-                showLoading('Finding your location\u2026');
+                showLoading('Getting your location\u2026', 'Using network and cached location for fastest result');
+
+                var geoResolved = false;
+                var slowHintShown = false;
+                var slowHintTimer = setTimeout(function () {
+                    if (geoResolved) return;
+                    slowHintShown = true;
+                    showLoading('Still getting your location\u2026', 'Taking longer than usual. You can search manually instead.');
+                    var fallback = document.getElementById('loading-fallback');
+                    if (fallback) {
+                        fallback.classList.remove('hidden');
+                        fallback.style.display = '';
+                    }
+                }, 8000);
 
                 navigator.geolocation.getCurrentPosition(
                     function (pos) {
+                        if (geoResolved) return;
+                        geoResolved = true;
+                        clearTimeout(slowHintTimer);
                         var lat = pos.coords.latitude.toFixed(4);
                         var lon = pos.coords.longitude.toFixed(4);
-                        showLoading('Loading forecast\u2026');
+                        showLoading('Loading local forecast\u2026', 'Fetching data from the National Weather Service');
+                        clearSearchBar();
                         window.location.href = '/weather?location=' + encodeURIComponent(lat + ',' + lon);
                     },
                     function (err) {
+                        if (geoResolved) return;
+                        geoResolved = true;
+                        clearTimeout(slowHintTimer);
                         btn.disabled = false;
                         btn.innerHTML = origHTML;
-                        hideLoading();
                         var msg = 'Could not get your location.';
                         if (err && err.code === 1) {
                             msg = 'Location permission denied. Please allow location access in your browser settings.';
@@ -291,13 +354,15 @@ var Clearcast = (function () {
                             msg = 'Location unavailable. Please check your device settings or try searching manually.';
                         } else if (err && err.code === 3) {
                             msg = 'Location request timed out. Please try again or search manually.';
+                        } else {
+                            msg = 'Could not get your location. Please try again or search manually.';
                         }
-                        alert(msg);
+                        showLoadingError(msg);
                     },
                     {
                         enableHighAccuracy: false,
-                        timeout: 10000,
-                        maximumAge: 300000
+                        timeout: 20000,
+                        maximumAge: 600000
                     }
                 );
             });

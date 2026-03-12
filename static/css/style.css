@@ -423,6 +423,46 @@ body {
     to { transform: rotate(360deg); }
 }
 
+.loading-error {
+    text-align: center;
+}
+
+.loading-error.hidden {
+    display: none !important;
+}
+
+.loading-error-icon {
+    font-size: 2rem;
+    color: var(--warning);
+    display: block;
+    margin-bottom: 1rem;
+}
+
+.loading-error-text {
+    color: var(--text);
+    font-size: 1rem;
+    margin: 0 0 1.25rem;
+    max-width: 320px;
+}
+
+.loading-error-btn {
+    margin-top: 0.5rem;
+}
+
+.loading-fallback {
+    margin-top: 1.25rem;
+}
+
+.loading-fallback.hidden {
+    display: none !important;
+}
+
+.loading-fallback-text {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin: 0 0 0.75rem;
+}
+
 /* ─── Main content ─── */
 .main-content {
     max-width: 1120px;
