@@ -95,16 +95,22 @@ def _get_weather_for_location(location_input):
     lat = geocode_result["lat"]
     lon = geocode_result["lon"]
     display_name = geocode_result.get("display_name", location_input)
+    coords_label = geocode_result.get("coords_label", "")
 
     coord_key = _coord_cache_key(lat, lon)
     cached = get_cached_weather(coord_key)
     if cached:
+        if coords_label and not cached.get("coords_label"):
+            cached["coords_label"] = coords_label
         set_cached_weather(cache_key, cached)
         return cached, None
 
     weather_data = fetch_weather_data(lat, lon, display_name)
     if not weather_data:
         return None, ("api_error", location_input)
+
+    if coords_label:
+        weather_data["coords_label"] = coords_label
 
     set_cached_weather(cache_key, weather_data)
     set_cached_weather(coord_key, weather_data)

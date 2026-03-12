@@ -8,6 +8,9 @@
     <!-- Dashboard Header -->
     <div class="dashboard-hero reveal">
         <h1 class="location-title">{{ weather.location }}</h1>
+        {% if weather.coords_label %}
+        <p class="location-coords">{{ weather.coords_label }}</p>
+        {% endif %}
         <p class="location-updated">{% if weather.current.last_updated %}Updated {{ weather.current.last_updated }}{% endif %}</p>
         <div class="fav-toggle-wrap" id="fav-toggle-hero" data-location="{{ location_input }}"></div>
     </div>
@@ -353,6 +356,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         var weatherData = {
             location: '{{ location_input|e }}',
+            displayName: {{ weather.location|tojson }},
             lat: {{ weather.lat|default(39)|tojson }},
             lon: {{ weather.lon|default(-98)|tojson }},
             chartHourly: {{ chart_hourly|tojson }},
@@ -366,7 +370,7 @@
         Clearcast.initExpandableCards();
         Clearcast.initCharts(weatherData.chartHourly);
         Clearcast.initFavorites(weatherData.location);
-        Clearcast.addRecent(weatherData.location);
+        Clearcast.addRecent(weatherData.location, weatherData.displayName);
     });
 </script>
 {% endblock %}

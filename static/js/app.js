@@ -34,10 +34,10 @@ var Clearcast = (function () {
         if (el) el.classList.add('hidden');
     }
 
-    /* ─── Clear search bar on dashboard pages ─── */
+    /* ─── Clear search bar after navigation/search ─── */
     function clearSearchBar() {
         var headerInput = document.getElementById('header-search-input');
-        if (headerInput && document.querySelector('.dashboard')) {
+        if (headerInput) {
             headerInput.value = '';
         }
     }
@@ -348,19 +348,41 @@ var Clearcast = (function () {
 
     function getRecents() {
         try {
-            return JSON.parse(localStorage.getItem(RECENTS_KEY)) || [];
+            var raw = JSON.parse(localStorage.getItem(RECENTS_KEY)) || [];
+            return raw.map(function (item) {
+                if (typeof item === 'string') {
+                    return { query: item, label: item };
+                }
+                return item;
+            });
         } catch (e) { return []; }
     }
 
-    function addRecent(location) {
-        if (!location) return;
+    function _recentKey(item) {
+        if (typeof item === 'string') return item.trim().toLowerCase();
+        return (item.query || item.label || '').trim().toLowerCase();
+    }
+
+    function addRecent(query, label) {
+        if (!query) return;
         try {
             var recents = getRecents();
-            var loc = location.trim();
-            var lower = loc.toLowerCase();
-            recents = recents.filter(function (r) { return r.trim().toLowerCase() !== lower; });
-            recents.unshift(loc);
+            var q = query.trim();
+            var lbl = (label || q).trim();
+            var lower = q.toLowerCase();
+            recents = recents.filter(function (r) { return _recentKey(r) !== lower; });
+            recents.unshift({ query: q, label: lbl });
             localStorage.setItem(RECENTS_KEY, JSON.stringify(recents.slice(0, MAX_RECENTS)));
+        } catch (e) { /* storage full or blocked */ }
+    }
+
+    function removeRecent(query) {
+        if (!query) return;
+        try {
+            var recents = getRecents();
+            var lower = query.trim().toLowerCase();
+            recents = recents.filter(function (r) { return _recentKey(r) !== lower; });
+            localStorage.setItem(RECENTS_KEY, JSON.stringify(recents));
         } catch (e) { /* storage full or blocked */ }
     }
 
@@ -469,21 +491,42 @@ var Clearcast = (function () {
             });
             favsSection.style.display = '';
             hasContent = true;
+        } else if (favsSection) {
+            favsSection.style.display = 'none';
         }
 
         if (recentsSection && recentsList && recents.length > 0) {
             recentsList.innerHTML = '';
             var extraItems = [];
 
-            recents.forEach(function (loc, i) {
+            recents.forEach(function (item, i) {
+                var query = item.query || item.label || '';
+                var label = item.label || item.query || '';
+
                 var li = document.createElement('li');
+                li.className = 'recent-item';
+
                 var a = document.createElement('a');
-                a.href = '/weather?location=' + encodeURIComponent(loc);
-                a.textContent = loc;
+                a.href = '/weather?location=' + encodeURIComponent(query);
+                a.textContent = label;
                 li.appendChild(a);
 
+                var rmBtn = document.createElement('button');
+                rmBtn.type = 'button';
+                rmBtn.className = 'recent-remove-btn';
+                rmBtn.title = 'Remove from recents';
+                rmBtn.setAttribute('aria-label', 'Remove ' + label + ' from recents');
+                rmBtn.innerHTML = '&times;';
+                rmBtn.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    removeRecent(query);
+                    renderLandingLists();
+                });
+                li.appendChild(rmBtn);
+
                 if (i >= RECENTS_DEFAULT_VISIBLE) {
-                    li.className = 'recents-extra-item';
+                    li.classList.add('recents-extra-item');
                     li.style.display = 'none';
                     extraItems.push(li);
                 }
@@ -510,10 +553,14 @@ var Clearcast = (function () {
 
             recentsSection.style.display = '';
             hasContent = true;
+        } else if (recentsSection) {
+            recentsSection.style.display = 'none';
         }
 
         if (hasContent) {
             container.style.display = '';
+        } else {
+            container.style.display = 'none';
         }
     }
 
@@ -1175,6 +1222,7 @@ var Clearcast = (function () {
         initNavScroll();
         initScrollReveal();
         initSearchForms();
+        clearSearchBar();
         hideLoading();
     }
 
@@ -1202,6 +1250,7 @@ var Clearcast = (function () {
         initCharts: initCharts,
         initFavorites: initFavorites,
         addRecent: addRecent,
+        removeRecent: removeRecent,
         renderLandingLists: renderLandingLists,
         renderHourlyChart: renderHourlyChart,
         renderDayCharts: renderDayCharts,

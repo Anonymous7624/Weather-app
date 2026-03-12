@@ -10,6 +10,7 @@ from .cache import get_cached_geocode, set_cached_geocode
 
 CENSUS_URL = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress"
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
+NOMINATIM_REVERSE_URL = "https://nominatim.openstreetmap.org/reverse"
 USER_AGENT = "Clearcast/1.0 (https://github.com/clearcast)"
 REQUEST_TIMEOUT = 8
 
@@ -171,11 +172,61 @@ def suggest_locations(query, limit=8):
     return results[:limit]
 
 
+def _reverse_geocode_nominatim(lat, lon):
+    """Reverse geocode lat/lon to a human-readable place name via Nominatim."""
+    params = {
+        "lat": lat,
+        "lon": lon,
+        "format": "json",
+        "zoom": 10,
+        "addressdetails": 1,
+    }
+    headers = {"User-Agent": USER_AGENT}
+    try:
+        resp = requests.get(
+            NOMINATIM_REVERSE_URL, params=params,
+            headers=headers, timeout=REQUEST_TIMEOUT,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except (requests.RequestException, ValueError):
+        return None
+
+    if not data or "error" in data:
+        return None
+
+    address = data.get("address", {})
+    city = (
+        address.get("city")
+        or address.get("town")
+        or address.get("village")
+        or address.get("hamlet")
+        or address.get("municipality")
+        or address.get("county")
+    )
+    state = address.get("state")
+
+    if city and state:
+        return f"Near {city}, {state}"
+    if city:
+        return f"Near {city}"
+    if state:
+        return state
+
+    raw_display = data.get("display_name")
+    if raw_display:
+        parts = [p.strip() for p in raw_display.split(",")]
+        return ", ".join(parts[:3])
+
+    return None
+
+
 def resolve_location(location_input):
     """
     Resolve a location string to lat/lon and display name.
     Supports: ZIP code, city/state, or lat,lon.
     Returns dict with lat, lon, display_name or None if resolution fails.
+    For raw coordinates, performs reverse geocoding for a human-readable label.
     """
     if not location_input or not isinstance(location_input, str):
         return None
@@ -187,11 +238,23 @@ def resolve_location(location_input):
     coords = _parse_lat_lon(s)
     if coords:
         lat, lon = coords
-        return {
-            "lat": round(lat, 4),
-            "lon": round(lon, 4),
-            "display_name": f"{lat:.2f}, {lon:.2f}",
+        rlat = round(lat, 4)
+        rlon = round(lon, 4)
+        cache_key = f"rev:{rlat},{rlon}"
+        cached = get_cached_geocode(cache_key)
+        if cached:
+            return cached
+
+        place_name = _reverse_geocode_nominatim(lat, lon)
+        display = place_name or f"{lat:.2f}, {lon:.2f}"
+        result = {
+            "lat": rlat,
+            "lon": rlon,
+            "display_name": display,
+            "coords_label": f"{rlat}, {rlon}",
         }
+        set_cached_geocode(cache_key, result)
+        return result
 
     cached = get_cached_geocode(s)
     if cached:
