@@ -1,10 +1,11 @@
 {% extends "base.html" %}
 
-{% block title %}Error – Clearcast{% endblock %}
+{% block title %}Error — Clearcast{% endblock %}
 
 {% block content %}
 <div class="error-page">
-    <div class="error-card">
+    <div class="error-card reveal">
+        <div class="error-icon" aria-hidden="true">&#9888;&#65039;</div>
         <h1>Something went wrong</h1>
         <p class="error-message">{{ message }}</p>
         <p class="error-suggestion">{{ suggestion }}</p>
@@ -17,10 +18,13 @@
             </div>
             <div class="error-search-buttons">
                 <button type="submit" class="btn btn-primary">Search</button>
-                <button type="button" class="btn btn-secondary use-location-btn">📍 Use My Location</button>
+                <button type="button" class="btn btn-secondary use-location-btn">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    Use My Location
+                </button>
             </div>
         </form>
-        <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Home</a>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary" style="margin-top: 0.5rem;">Back to Home</a>
     </div>
 </div>
 {% endblock %}

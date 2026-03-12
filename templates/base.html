@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Clearcast{% endblock %}</title>
+    <meta name="theme-color" content="#0f1419">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
@@ -11,34 +12,62 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body class="theme-dark">
-    <header class="site-header">
-        <a href="{{ url_for('index') }}" class="logo">Clearcast</a>
-        <form class="search-form" action="{{ url_for('weather') }}" method="get" role="search">
-            <div class="search-wrap">
-                <input type="text" name="location" placeholder="ZIP, city/state, or lat,lon"
-                       value="{{ location_input|default('', true) }}" autocomplete="off" class="search-input"
-                       id="header-search-input" aria-label="Search location" aria-autocomplete="list" aria-controls="search-suggestions" aria-expanded="false">
-                <div id="search-suggestions" class="search-suggestions hidden" role="listbox"></div>
+    <div class="bg-gradient" aria-hidden="true"></div>
+
+    <nav class="nav" role="navigation" aria-label="Main navigation">
+        <div class="nav-inner">
+            <a href="{{ url_for('index') }}" class="nav-brand">
+                <span class="nav-brand-icon" aria-hidden="true">&#9729;</span>
+                Clearcast
+            </a>
+            <div class="nav-controls">
+                <form class="nav-search-form" action="{{ url_for('weather') }}" method="get" role="search">
+                    <div class="search-wrap">
+                        <input type="text" name="location" placeholder="Search location&hellip;"
+                               value="{{ location_input|default('', true) }}" autocomplete="off"
+                               class="nav-search-input" id="header-search-input"
+                               aria-label="Search location" aria-autocomplete="list"
+                               aria-controls="search-suggestions" aria-expanded="false">
+                        <div id="search-suggestions" class="search-suggestions hidden" role="listbox"></div>
+                    </div>
+                    <button type="submit" class="nav-search-btn" aria-label="Search">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                    </button>
+                </form>
+                <button type="button" class="btn-icon use-location-btn" title="Use my location" aria-label="Use my location">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                </button>
+                <button type="button" class="btn-icon theme-toggle" aria-label="Toggle dark/light mode" title="Toggle theme"></button>
             </div>
-            <button type="submit" class="btn btn-primary">Search</button>
-            <button type="button" class="btn btn-secondary use-location-btn" title="Use my location" aria-label="Use my location">
-                📍 Use My Location
-            </button>
-        </form>
-        <button type="button" class="theme-toggle" aria-label="Toggle dark/light mode" title="Toggle theme"></button>
-    </header>
+        </div>
+    </nav>
+
     <div id="loading-overlay" class="loading-overlay hidden">
-        <div>
+        <div class="loading-content">
             <div class="loading-spinner"></div>
-            <p class="loading-text">Loading forecast…</p>
+            <p class="loading-text">Loading forecast&hellip;</p>
         </div>
     </div>
+
     <main class="main-content">
         {% block content %}{% endblock %}
     </main>
-    <footer class="site-footer">
-        <p>Weather data from <a href="https://www.weather.gov" target="_blank" rel="noopener">National Weather Service</a>&ensp;·&ensp;Powered by <strong>Clearcast</strong></p>
+
+    <footer class="footer">
+        <div class="footer-inner">
+            <div class="footer-brand">
+                <span class="footer-brand-name">&#9729; Clearcast</span>
+                <span class="footer-brand-desc">Intelligent weather, beautifully clear.</span>
+            </div>
+            <div class="footer-links">
+                <a href="{{ url_for('index') }}" class="footer-link">Home</a>
+                <a href="https://www.weather.gov" class="footer-link" target="_blank" rel="noopener">NWS Data</a>
+                <a href="https://ldawg7624.com" class="footer-link" target="_blank" rel="noopener">About</a>
+            </div>
+            <p class="footer-note">Weather data from the National Weather Service. Clearcast is an open-source project.</p>
+        </div>
     </footer>
+
     {% block scripts %}{% endblock %}
 </body>
 </html>

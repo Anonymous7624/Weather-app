@@ -1,15 +1,26 @@
 {% extends "base.html" %}
 
-{% block title %}Clearcast – Intelligent Weather Dashboard{% endblock %}
+{% block title %}Clearcast — Intelligent Weather Dashboard{% endblock %}
 
 {% block content %}
 <div class="landing">
-    <div class="landing-hero">
-        <h1>Clearcast</h1>
-        <p class="tagline">Intelligent weather forecasts powered by the National Weather Service. Clean design, real-time data, zero noise.</p>
+    <div class="landing-badge reveal">
+        <span class="landing-badge-dot" aria-hidden="true"></span>
+        Powered by the National Weather Service
     </div>
 
-    <form class="landing-search" action="{{ url_for('weather') }}" method="get">
+    <div class="landing-hero">
+        <h1 class="reveal reveal-delay-1">
+            Weather forecasts,<br>
+            <span class="gradient-text">beautifully clear.</span>
+        </h1>
+    </div>
+
+    <p class="landing-tagline reveal reveal-delay-2">
+        Clean forecasts, live radar, real-time alerts, and deep hourly data &mdash; without the clutter, ads, or noise.
+    </p>
+
+    <form class="landing-search reveal reveal-delay-3" action="{{ url_for('weather') }}" method="get">
         <div class="search-wrap landing-search-wrap">
             <input type="text" name="location" placeholder="Enter ZIP code, city/state, or coordinates"
                    value="{{ location_prefill|default(default_location, true) }}" autocomplete="off" class="landing-input" required
@@ -17,35 +28,43 @@
             <div id="landing-suggestions" class="search-suggestions hidden" role="listbox"></div>
         </div>
         <div class="landing-buttons">
-            <button type="submit" class="btn btn-primary btn-lg">Get Forecast</button>
+            <button type="submit" class="btn btn-primary btn-lg">
+                Get Forecast
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </button>
             <button type="button" class="btn btn-secondary btn-lg use-location-btn" title="Use my location">
-                📍 Use My Location
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                Use My Location
             </button>
         </div>
     </form>
 
-    <p class="landing-hint">Examples: 90210, Boston MA, 42.36,-71.06</p>
+    <p class="landing-hint reveal reveal-delay-4">Examples: 90210, Boston MA, 42.36,-71.06</p>
 
-    {% if favorites %}
-    <section class="favorites-section">
-        <h2>★ Favorite Locations</h2>
-        <ul class="favorites-list">
-            {% for loc in favorites %}
-            <li><a href="{{ url_for('weather', location=loc) }}" class="fav-link">{{ loc }}</a></li>
-            {% endfor %}
-        </ul>
-    </section>
-    {% endif %}
+    {% if favorites or recent_searches %}
+    <div class="landing-sections reveal reveal-delay-5">
+        {% if favorites %}
+        <div class="landing-section-card">
+            <h2>&#9733; Favorites</h2>
+            <ul>
+                {% for loc in favorites %}
+                <li><a href="{{ url_for('weather', location=loc) }}">{{ loc }}</a></li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
 
-    {% if recent_searches %}
-    <section class="recent-section">
-        <h2>Recent Searches</h2>
-        <ul class="recent-list">
-            {% for loc in recent_searches %}
-            <li><a href="{{ url_for('weather', location=loc) }}" class="recent-link">{{ loc }}</a></li>
-            {% endfor %}
-        </ul>
-    </section>
+        {% if recent_searches %}
+        <div class="landing-section-card">
+            <h2>&#128337; Recent</h2>
+            <ul>
+                {% for loc in recent_searches %}
+                <li><a href="{{ url_for('weather', location=loc) }}">{{ loc }}</a></li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
     {% endif %}
 </div>
 {% endblock %}
