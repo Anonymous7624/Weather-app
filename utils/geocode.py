@@ -6,13 +6,12 @@ Both are free and require no API key.
 
 import re
 import requests
+from .cache import get_cached_geocode, set_cached_geocode
 
-# US Census - free, no key, US addresses/ZIP/city
 CENSUS_URL = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress"
-# Nominatim - OpenStreetMap fallback
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 USER_AGENT = "Clearcast/1.0 (https://github.com/clearcast)"
-REQUEST_TIMEOUT = 12
+REQUEST_TIMEOUT = 8
 
 
 def _parse_lat_lon(input_str):
@@ -123,7 +122,6 @@ def suggest_locations(query, limit=8):
             seen.add(key)
             results.append(r)
 
-    # Try Census first for US addresses/ZIP
     params = {
         "address": q,
         "benchmark": "Public_AR_Current",
@@ -145,7 +143,6 @@ def suggest_locations(query, limit=8):
     except (requests.RequestException, ValueError):
         pass
 
-    # Fill with Nominatim if needed
     if len(results) < limit:
         params = {
             "q": q,
@@ -187,7 +184,6 @@ def resolve_location(location_input):
     if not s:
         return None
 
-    # Check for explicit lat,lon
     coords = _parse_lat_lon(s)
     if coords:
         lat, lon = coords
@@ -197,14 +193,18 @@ def resolve_location(location_input):
             "display_name": f"{lat:.2f}, {lon:.2f}",
         }
 
-    # Try Census first (US addresses, ZIP codes)
+    cached = get_cached_geocode(s)
+    if cached:
+        return cached
+
     result = _geocode_census(s)
     if result:
+        set_cached_geocode(s, result)
         return result
 
-    # Fallback to Nominatim
     result = _geocode_nominatim(s)
     if result:
+        set_cached_geocode(s, result)
         return result
 
     return None

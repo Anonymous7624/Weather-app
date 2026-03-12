@@ -4,7 +4,12 @@ Handles missing fields safely. All temperatures output in Fahrenheit.
 """
 
 import re
-from datetime import datetime
+from datetime import datetime, timezone as _tz
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    ZoneInfo = None
 
 try:
     from .sun import get_sunrise_sunset
@@ -16,20 +21,31 @@ def _safe(value, default=""):
     return value if value is not None else default
 
 
-def _parse_iso_date(s):
-    """Parse ISO 8601 date and return a readable string."""
+def _to_local(dt, tz_name):
+    """Convert an aware datetime to the given IANA timezone."""
+    if not tz_name or ZoneInfo is None:
+        return dt
+    try:
+        return dt.astimezone(ZoneInfo(tz_name))
+    except (KeyError, Exception):
+        return dt
+
+
+def _parse_iso_date(s, tz_name=""):
+    """Parse ISO 8601 date and return a readable string in local time."""
     if not s:
         return ""
     try:
         if "/" in str(s):
             s = str(s).split("/")[0]
         dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        dt = _to_local(dt, tz_name)
         return dt.strftime("%a %b %d, %I %p").replace(" 0", " ")
     except (ValueError, TypeError):
         return str(s)[:19]
 
 
-def _short_time(s):
+def _short_time(s, tz_name=""):
     """Extract short time (e.g., 2 PM) from ISO string."""
     if not s:
         return ""
@@ -37,6 +53,7 @@ def _short_time(s):
         if "/" in str(s):
             s = str(s).split("/")[0]
         dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        dt = _to_local(dt, tz_name)
         return dt.strftime("%-I %p")
     except (ValueError, TypeError):
         return ""
@@ -182,27 +199,35 @@ def _obs_unit(obs_props, key):
     return ""
 
 
-def _format_obs_time(iso_str):
-    """Format observation timestamp to readable time."""
+def _format_obs_time(iso_str, tz_name=""):
+    """Format observation timestamp to readable time in the location's timezone."""
     if not iso_str:
         return ""
     try:
         if "/" in str(iso_str):
             iso_str = str(iso_str).split("/")[0]
         dt = datetime.fromisoformat(str(iso_str).replace("Z", "+00:00"))
+        now_utc = datetime.now(_tz.utc)
+        if dt > now_utc:
+            dt = now_utc
+        dt = _to_local(dt, tz_name)
         return dt.strftime("%-I:%M %p")
     except (ValueError, TypeError):
         return str(iso_str)[:16]
 
 
-def _format_obs_datetime(iso_str):
-    """Format observation timestamp to readable date and time."""
+def _format_obs_datetime(iso_str, tz_name=""):
+    """Format observation timestamp to readable date and time in local timezone."""
     if not iso_str:
         return ""
     try:
         if "/" in str(iso_str):
             iso_str = str(iso_str).split("/")[0]
         dt = datetime.fromisoformat(str(iso_str).replace("Z", "+00:00"))
+        now_utc = datetime.now(_tz.utc)
+        if dt > now_utc:
+            dt = now_utc
+        dt = _to_local(dt, tz_name)
         return dt.strftime("%a %b %-d, %-I:%M %p")
     except (ValueError, TypeError):
         return str(iso_str)[:19]
@@ -306,8 +331,10 @@ def _is_night_period(name):
 
 def normalize_weather_data(display_name, forecast, hourly, alerts_data,
                           observations_data=None, grid_data=None, lat=None, lon=None,
-                          station_name=None, station_id=None):
+                          station_name=None, station_id=None, timezone=""):
     """Build a single normalized dict for the dashboard template."""
+
+    tz = timezone or ""
 
     # --- Alerts ---
     alerts = []
@@ -318,8 +345,8 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
             title = _safe(p.get("event", "Alert"))
             headline = _safe(p.get("headline", ""))
             desc = _safe(p.get("description", ""))
-            onset = _parse_iso_date(p.get("onset"))
-            expires = _parse_iso_date(p.get("expires"))
+            onset = _parse_iso_date(p.get("onset"), tz)
+            expires = _parse_iso_date(p.get("expires"), tz)
             instruction = _safe(p.get("instruction", ""))
             alerts.append({
                 "title": title,
@@ -459,8 +486,8 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
 
         ts = obs_props.get("timestamp")
         if ts:
-            current["last_updated"] = _format_obs_time(ts)
-            current["last_updated_full"] = _format_obs_datetime(ts)
+            current["last_updated"] = _format_obs_time(ts, tz)
+            current["last_updated_full"] = _format_obs_datetime(ts, tz)
 
     # If observation didn't provide feels_like, compute from observation data
     if current["feels_like_value"] is None and current["temp_value"] is not None:
@@ -489,7 +516,7 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
             wind = _wind_string(p.get("windDirection"), p.get("windSpeed"))
             short = _safe(p.get("shortForecast", ""))
             detailed = _safe(p.get("detailedForecast", ""))
-            start = _parse_iso_date(p.get("startTime", ""))
+            start = _parse_iso_date(p.get("startTime", ""), tz)
 
             precip_raw = p.get("probabilityOfPrecipitation") or {}
             precip_val = precip_raw.get("value") if isinstance(precip_raw, dict) else precip_raw
@@ -574,7 +601,7 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
             wind = _wind_string(hp.get("windDirection"), hp.get("windSpeed"))
             short = _safe(hp.get("shortForecast", ""))
             start = hp.get("startTime", "")
-            time_str = _short_time(start)
+            time_str = _short_time(start, tz)
             if not time_str:
                 time_str = start[:16] if start else ""
 
@@ -632,7 +659,7 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
             )
 
             chart_hourly.append({
-                "time": _short_time(hp.get("startTime", "")),
+                "time": _short_time(hp.get("startTime", ""), tz),
                 "raw_start_time": hp.get("startTime", ""),
                 "temp": temp_f,
                 "precip": int(precip_val) if precip_val is not None else None,
@@ -868,38 +895,3 @@ def _compute_best_time(periods, hourly):
     if best[0] <= 0:
         return "Conditions may be variable. Check the hourly forecast."
     return f"{best[1]}: {best[3]} ({best[2]}) \u2014 Good time to go outside."
-
-
-# TODO: Historical weather data placeholder.
-#
-# The NWS observations API supports querying past observations:
-#   GET /stations/{stationId}/observations?start={ISO8601}&end={ISO8601}
-#
-# To implement "Past 3 Days" section:
-#   1. Fetch observations for the past 72 hours from the nearest station.
-#   2. Aggregate hourly observations into daily summaries:
-#      - observed high / low temperatures
-#      - dominant conditions (most frequent textDescription)
-#      - total precipitation (precipitationLastHour values)
-#      - average humidity, wind, pressure
-#   3. Return a list of daily dicts similar to the daily forecast format.
-#
-# This is NOT currently implemented because:
-#   - The current data flow only fetches limit=1 (latest observation)
-#   - Aggregating raw observations into reliable daily summaries requires
-#     handling missing data, station outages, and varying report intervals
-#   - Quality varies significantly by station
-#
-# Future implementation:
-#   def fetch_historical_observations(station_id, days=3):
-#       from datetime import datetime, timedelta, timezone
-#       end = datetime.now(timezone.utc)
-#       start = end - timedelta(days=days)
-#       url = f"{NWS_BASE}/stations/{station_id}/observations"
-#       params = {"start": start.isoformat(), "end": end.isoformat()}
-#       data = _get(url, params=params)
-#       return _aggregate_daily_observations(data)
-#
-#   def _aggregate_daily_observations(obs_data):
-#       """Group observations by date, compute high/low/conditions per day."""
-#       pass  # implement aggregation logic

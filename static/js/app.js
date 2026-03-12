@@ -18,14 +18,28 @@ var Clearcast = (function () {
     var RECENTS_DEFAULT_VISIBLE = 3;
 
     /* ─── Loading overlay ─── */
-    function showLoading() {
+    function showLoading(text) {
         var el = document.getElementById(loadingId);
-        if (el) el.classList.remove('hidden');
+        if (el) {
+            el.classList.remove('hidden');
+            var textEl = el.querySelector('.loading-text');
+            if (textEl && text) {
+                textEl.textContent = text;
+            }
+        }
     }
 
     function hideLoading() {
         var el = document.getElementById(loadingId);
         if (el) el.classList.add('hidden');
+    }
+
+    /* ─── Clear search bar on dashboard pages ─── */
+    function clearSearchBar() {
+        var headerInput = document.getElementById('header-search-input');
+        if (headerInput && document.querySelector('.dashboard')) {
+            headerInput.value = '';
+        }
     }
 
     /* ─── Theme toggle ─── */
@@ -107,13 +121,15 @@ var Clearcast = (function () {
             form.addEventListener('submit', function () {
                 var input = form.querySelector('input[name="location"]');
                 if (input && input.value.trim()) {
-                    showLoading();
+                    showLoading('Loading forecast\u2026');
                 }
             });
         });
     }
 
     /* ─── Autocomplete ─── */
+    var _suggestCache = {};
+
     function initAutocomplete(inputId, dropdownId) {
         var input = document.getElementById(inputId);
         var dropdown = document.getElementById(dropdownId);
@@ -144,7 +160,7 @@ var Clearcast = (function () {
                 hideSuggestions();
                 var form = input.closest('form');
                 if (form) {
-                    showLoading();
+                    showLoading('Loading forecast\u2026');
                     form.submit();
                 }
             }
@@ -155,34 +171,45 @@ var Clearcast = (function () {
                 hideSuggestions();
                 return;
             }
+            var cacheKey = q.toLowerCase();
+            if (_suggestCache[cacheKey]) {
+                suggestions = _suggestCache[cacheKey];
+                renderSuggestions();
+                return;
+            }
             fetch('/api/geocode-suggest?q=' + encodeURIComponent(q) + '&limit=8')
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     suggestions = data || [];
-                    dropdown.innerHTML = '';
-                    selectedIndex = -1;
-                    if (suggestions.length === 0) {
-                        hideSuggestions();
-                        return;
-                    }
-                    suggestions.forEach(function (s, i) {
-                        var btn = document.createElement('button');
-                        btn.type = 'button';
-                        btn.className = 'suggestion-item';
-                        btn.role = 'option';
-                        btn.id = dropdownId + '-opt-' + i;
-                        btn.textContent = s.display_name;
-                        btn.setAttribute('aria-selected', 'false');
-                        btn.addEventListener('click', function () {
-                            selectSuggestion(i);
-                        });
-                        dropdown.appendChild(btn);
-                    });
-                    showSuggestions();
+                    _suggestCache[cacheKey] = suggestions;
+                    renderSuggestions();
                 })
                 .catch(function () {
                     hideSuggestions();
                 });
+        }
+
+        function renderSuggestions() {
+            dropdown.innerHTML = '';
+            selectedIndex = -1;
+            if (suggestions.length === 0) {
+                hideSuggestions();
+                return;
+            }
+            suggestions.forEach(function (s, i) {
+                var btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'suggestion-item';
+                btn.role = 'option';
+                btn.id = dropdownId + '-opt-' + i;
+                btn.textContent = s.display_name;
+                btn.setAttribute('aria-selected', 'false');
+                btn.addEventListener('click', function () {
+                    selectSuggestion(i);
+                });
+                dropdown.appendChild(btn);
+            });
+            showSuggestions();
         }
 
         input.addEventListener('input', function () {
@@ -244,17 +271,33 @@ var Clearcast = (function () {
                 btn.disabled = true;
                 var origHTML = btn.innerHTML;
                 btn.textContent = 'Locating\u2026';
+                showLoading('Finding your location\u2026');
+
                 navigator.geolocation.getCurrentPosition(
                     function (pos) {
                         var lat = pos.coords.latitude.toFixed(4);
                         var lon = pos.coords.longitude.toFixed(4);
-                        showLoading();
+                        showLoading('Loading forecast\u2026');
                         window.location.href = '/weather?location=' + encodeURIComponent(lat + ',' + lon);
                     },
-                    function () {
+                    function (err) {
                         btn.disabled = false;
                         btn.innerHTML = origHTML;
-                        alert('Could not get your location. Please check permissions or try again.');
+                        hideLoading();
+                        var msg = 'Could not get your location.';
+                        if (err && err.code === 1) {
+                            msg = 'Location permission denied. Please allow location access in your browser settings.';
+                        } else if (err && err.code === 2) {
+                            msg = 'Location unavailable. Please check your device settings or try searching manually.';
+                        } else if (err && err.code === 3) {
+                            msg = 'Location request timed out. Please try again or search manually.';
+                        }
+                        alert(msg);
+                    },
+                    {
+                        enableHighAccuracy: false,
+                        timeout: 10000,
+                        maximumAge: 300000
                     }
                 );
             });
@@ -898,7 +941,6 @@ var Clearcast = (function () {
         var labels = chartData.map(function (d) { return d.time; });
         var baseOpts = chartDefaults();
 
-        // Temperature
         var tempEl = document.getElementById('day-temp-chart');
         if (tempEl) {
             var tempData = chartData.map(function (d) { return d.temp; });
@@ -931,7 +973,6 @@ var Clearcast = (function () {
             });
         }
 
-        // Real Feel / Apparent Temperature
         var apparentEl = document.getElementById('day-apparent-chart');
         if (apparentEl) {
             var apparentCanvas = document.createElement('canvas');
@@ -995,7 +1036,6 @@ var Clearcast = (function () {
             });
         }
 
-        // Precipitation
         var precipEl = document.getElementById('day-precip-chart');
         if (precipEl) {
             var precipCanvas = document.createElement('canvas');
@@ -1026,7 +1066,6 @@ var Clearcast = (function () {
             });
         }
 
-        // Wind
         var windEl = document.getElementById('day-wind-chart');
         if (windEl) {
             var windCanvas = document.createElement('canvas');
@@ -1058,7 +1097,6 @@ var Clearcast = (function () {
             });
         }
 
-        // Humidity
         var humidityEl = document.getElementById('day-humidity-chart');
         if (humidityEl) {
             var humidCanvas = document.createElement('canvas');
@@ -1142,6 +1180,7 @@ var Clearcast = (function () {
 
     function initDashboard(opts) {
         init();
+        clearSearchBar();
         if (opts && opts.refreshInterval) {
             initAutoRefresh(opts.refreshInterval);
         }
@@ -1152,6 +1191,7 @@ var Clearcast = (function () {
         initDashboard: initDashboard,
         initDayDetail: function () {
             init();
+            clearSearchBar();
             initDayDetailTabs();
         },
         initAutocomplete: initAutocomplete,
