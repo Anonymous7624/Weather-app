@@ -12,7 +12,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from utils.config import get_default_location
-from utils.geocode import resolve_location, suggest_locations, is_coord_input
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from utils.geocode import resolve_location, reverse_geocode, suggest_locations, is_coord_input
 from utils.nws import fetch_weather_data
 from utils.cache import get_cached_weather, set_cached_weather
 
@@ -94,7 +95,7 @@ def _get_weather_for_location(location_input):
 
     lat = geocode_result["lat"]
     lon = geocode_result["lon"]
-    display_name = geocode_result.get("display_name", location_input)
+    display_name = geocode_result.get("display_name") or location_input
     coords_label = geocode_result.get("coords_label", "")
 
     coord_key = _coord_cache_key(lat, lon)
@@ -105,10 +106,22 @@ def _get_weather_for_location(location_input):
         set_cached_weather(cache_key, cached)
         return cached, None
 
-    weather_data = fetch_weather_data(lat, lon, display_name)
+    # For coord input: run reverse geocode in parallel with weather fetch (no blocking)
+    is_coords = is_coord_input(location_input)
+    if is_coords:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            future_weather = pool.submit(fetch_weather_data, lat, lon, coords_label)
+            future_rev = pool.submit(reverse_geocode, lat, lon)
+            weather_data = future_weather.result()
+            place_name = future_rev.result()
+        display_name = place_name or coords_label
+    else:
+        weather_data = fetch_weather_data(lat, lon, display_name)
+
     if not weather_data:
         return None, ("api_error", location_input)
 
+    weather_data["location"] = display_name
     if coords_label:
         weather_data["coords_label"] = coords_label
 

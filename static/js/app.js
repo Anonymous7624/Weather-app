@@ -81,9 +81,9 @@ var Clearcast = (function () {
     /* ─── Clear search bar after navigation/search ─── */
     function clearSearchBar() {
         var headerInput = document.getElementById('header-search-input');
-        if (headerInput) {
-            headerInput.value = '';
-        }
+        var landingInput = document.getElementById('landing-search-input');
+        if (headerInput) headerInput.value = '';
+        if (landingInput) landingInput.value = '';
     }
 
     /* ─── Theme toggle ─── */
@@ -318,26 +318,33 @@ var Clearcast = (function () {
                 showLoading('Getting your location\u2026', 'Using network and cached location for fastest result');
 
                 var geoResolved = false;
-                var slowHintShown = false;
+                var clientTimeout = setTimeout(function () {
+                    if (geoResolved) return;
+                    geoResolved = true;
+                    btn.disabled = false;
+                    btn.innerHTML = origHTML;
+                    showLoadingError('Location request timed out. Please try again or search manually.');
+                }, 65000);
+
                 var slowHintTimer = setTimeout(function () {
                     if (geoResolved) return;
-                    slowHintShown = true;
-                    showLoading('Still getting your location\u2026', 'Taking longer than usual. You can search manually instead.');
+                    showLoading('Still getting your location\u2026', 'You can search manually if needed.');
                     var fallback = document.getElementById('loading-fallback');
                     if (fallback) {
                         fallback.classList.remove('hidden');
                         fallback.style.display = '';
                     }
-                }, 8000);
+                }, 12000);
 
                 navigator.geolocation.getCurrentPosition(
                     function (pos) {
                         if (geoResolved) return;
                         geoResolved = true;
                         clearTimeout(slowHintTimer);
+                        clearTimeout(clientTimeout);
                         var lat = pos.coords.latitude.toFixed(4);
                         var lon = pos.coords.longitude.toFixed(4);
-                        showLoading('Loading local forecast\u2026', 'Fetching data from the National Weather Service');
+                        showLoading('Loading forecast\u2026', 'Fetching data from the National Weather Service');
                         clearSearchBar();
                         window.location.href = '/weather?location=' + encodeURIComponent(lat + ',' + lon);
                     },
@@ -345,6 +352,7 @@ var Clearcast = (function () {
                         if (geoResolved) return;
                         geoResolved = true;
                         clearTimeout(slowHintTimer);
+                        clearTimeout(clientTimeout);
                         btn.disabled = false;
                         btn.innerHTML = origHTML;
                         var msg = 'Could not get your location.';
@@ -361,8 +369,8 @@ var Clearcast = (function () {
                     },
                     {
                         enableHighAccuracy: false,
-                        timeout: 20000,
-                        maximumAge: 600000
+                        timeout: 60000,
+                        maximumAge: 300000
                     }
                 );
             });
