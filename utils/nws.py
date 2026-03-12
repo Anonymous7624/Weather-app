@@ -10,7 +10,7 @@ from .normalize import normalize_weather_data
 NWS_BASE = "https://api.weather.gov"
 USER_AGENT = "Clearcast/1.0 (Raspberry Pi; https://github.com/clearcast)"
 REQUEST_TIMEOUT = 15
-COORD_PRECISION = 4  # NWS recommends up to 4 decimal places
+COORD_PRECISION = 4
 
 
 def _get(url):
@@ -44,29 +44,29 @@ def fetch_weather_data(lat, lon, display_name):
     if not forecast_url:
         return None
 
-    # Fetch forecast and hourly
     forecast = _get(forecast_url) if forecast_url else None
     hourly = _get(hourly_url) if hourly_url else None
 
-    # Alerts
     alerts_url = f"{NWS_BASE}/alerts/active?point={lat},{lon}"
     alerts_data = _get(alerts_url)
 
-    # Observations (for current conditions: temp, dewpoint, humidity, visibility, pressure)
     observations_data = None
+    station_name = None
+    station_id = None
+
     if obs_stations_url:
         stations = _get(obs_stations_url)
         if stations and "features" in stations and stations["features"]:
             first_station = stations["features"][0]
-            station_id = first_station.get("properties", {}).get("stationIdentifier")
+            station_props = first_station.get("properties", {})
+            station_id = station_props.get("stationIdentifier")
+            station_name = station_props.get("name")
             if station_id:
                 obs_url = f"{NWS_BASE}/stations/{station_id}/observations?limit=1"
                 observations_data = _get(obs_url)
 
-    # Grid data (for sunrise/sunset if available)
     grid_data = _get(forecast_grid_url) if forecast_grid_url else None
 
-    # Normalize into a clean structure
     return normalize_weather_data(
         display_name=display_name,
         lat=lat,
@@ -76,4 +76,6 @@ def fetch_weather_data(lat, lon, display_name):
         alerts_data=alerts_data,
         observations_data=observations_data,
         grid_data=grid_data,
+        station_name=station_name,
+        station_id=station_id,
     )

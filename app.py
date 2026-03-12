@@ -1,16 +1,17 @@
 """
 Clearcast - A lightweight weather dashboard for Raspberry Pi.
 Uses the official NWS API (api.weather.gov) with a Flask backend.
+Favorites and recents are stored client-side via localStorage for per-user privacy.
 """
 
 import os
 from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flask import Flask, render_template, request, redirect, url_for, jsonify, make_response
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from utils.config import get_config
+from utils.config import get_default_location
 from utils.geocode import resolve_location, suggest_locations
 from utils.nws import fetch_weather_data
 from utils.cache import get_cached_weather, set_cached_weather
@@ -18,6 +19,9 @@ from utils.cache import get_cached_weather, set_cached_weather
 app = Flask(__name__)
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
 app.config["MAX_CONTENT_LENGTH"] = 1024
+
+COOKIE_LAST_LOCATION = "clearcast_last_location"
+COOKIE_MAX_AGE = 365 * 24 * 3600
 
 
 def _extract_date(iso_str):
@@ -41,7 +45,7 @@ def _format_day_date(iso_str):
         if "/" in str(iso_str):
             iso_str = str(iso_str).split("/")[0]
         dt = datetime.fromisoformat(str(iso_str).replace("Z", "+00:00"))
-        return dt.strftime("%A, %B %d").replace(" 0", " ")
+        return dt.strftime("%A, %B %-d")
     except (ValueError, TypeError):
         return ""
 
@@ -98,15 +102,14 @@ def _get_weather_for_location(location_input):
 @app.route("/")
 def index():
     """Landing page with search form."""
-    config = get_config()
-    location_prefill = config.get_last_location() or config.default_location
+    default_location = get_default_location()
+    last_location = request.cookies.get(COOKIE_LAST_LOCATION, "")
+    location_prefill = last_location or default_location
     return render_template(
         "index.html",
-        default_location=config.default_location,
+        default_location=default_location,
         location_prefill=location_prefill,
         location_input=location_prefill,
-        recent_searches=config.get_recent_searches(),
-        favorites=config.get_favorites(),
     )
 
 
@@ -116,10 +119,11 @@ def weather():
     location_input = request.args.get("location", "").strip()
 
     if not location_input:
-        config = get_config()
-        location = config.get_last_location() or config.default_location
-        if location:
-            return redirect(url_for("weather", location=location))
+        last = request.cookies.get(COOKIE_LAST_LOCATION, "")
+        if not last:
+            last = get_default_location()
+        if last:
+            return redirect(url_for("weather", location=last))
         return redirect(url_for("index"))
 
     weather_data, error = _get_weather_for_location(location_input)
@@ -141,21 +145,14 @@ def weather():
                 location_input=loc,
             ), 502
 
-    config = get_config()
-    config.add_recent_search(location_input)
-    config.set_last_location(location_input)
-
-    favs_lower = [f.strip().lower() for f in config.get_favorites()]
-    is_favorite = location_input.strip().lower() in favs_lower
-    return render_template(
+    resp = make_response(render_template(
         "dashboard.html",
         weather=weather_data,
         location_input=location_input,
-        config=config,
-        is_favorite=is_favorite,
-        favorites=config.get_favorites(),
         chart_hourly=weather_data.get("chart_hourly", []),
-    )
+    ))
+    resp.set_cookie(COOKIE_LAST_LOCATION, location_input, max_age=COOKIE_MAX_AGE, samesite="Lax")
+    return resp
 
 
 @app.route("/weather/day/<int:day_index>")
@@ -178,10 +175,6 @@ def weather_day(day_index):
     day_chart = _filter_chart_for_day(weather_data, day)
     day_date = _format_day_date(day.get("raw_start_time"))
 
-    config = get_config()
-    favs_lower = [f.strip().lower() for f in config.get_favorites()]
-    is_favorite = location_input.strip().lower() in favs_lower
-
     prev_index = day_index - 1 if day_index > 0 else None
     next_index = day_index + 1 if day_index < len(daily) - 1 else None
 
@@ -194,24 +187,10 @@ def weather_day(day_index):
         day_hourly=day_hourly,
         day_chart=day_chart,
         location_input=location_input,
-        is_favorite=is_favorite,
-        favorites=config.get_favorites(),
         total_days=len(daily),
         prev_index=prev_index,
         next_index=next_index,
     )
-
-
-@app.route("/api/add-favorite", methods=["POST"])
-def add_favorite():
-    """Add a location to favorites."""
-    data = request.get_json(force=True, silent=True) or request.form
-    location = (data.get("location") or "").strip()
-    if location:
-        config = get_config()
-        config.add_favorite(location)
-        return {"ok": True}
-    return {"ok": False}, 400
 
 
 @app.route("/api/geocode-suggest")
@@ -221,18 +200,6 @@ def geocode_suggest():
     limit = min(int(request.args.get("limit", 8)), 10)
     suggestions = suggest_locations(q, limit=limit)
     return jsonify(suggestions)
-
-
-@app.route("/api/remove-favorite", methods=["POST"])
-def remove_favorite():
-    """Remove a location from favorites."""
-    data = request.get_json(force=True, silent=True) or request.form
-    location = (data.get("location") or "").strip()
-    if location:
-        config = get_config()
-        config.remove_favorite(location)
-        return {"ok": True}
-    return {"ok": False}, 400
 
 
 @app.errorhandler(404)

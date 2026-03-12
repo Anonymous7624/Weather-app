@@ -41,31 +41,17 @@
 
     <p class="landing-hint reveal reveal-delay-4">Examples: 90210, Boston MA, 42.36,-71.06</p>
 
-    {% if favorites or recent_searches %}
-    <div class="landing-sections reveal reveal-delay-5">
-        {% if favorites %}
-        <div class="landing-section-card">
+    <!-- Favorites and recents populated by JS from localStorage -->
+    <div class="landing-sections reveal reveal-delay-5" id="landing-lists" style="display:none">
+        <div class="landing-section-card" id="landing-favorites" style="display:none">
             <h2>&#9733; Favorites</h2>
-            <ul>
-                {% for loc in favorites %}
-                <li><a href="{{ url_for('weather', location=loc) }}">{{ loc }}</a></li>
-                {% endfor %}
-            </ul>
+            <ul id="favorites-list"></ul>
         </div>
-        {% endif %}
-
-        {% if recent_searches %}
-        <div class="landing-section-card">
+        <div class="landing-section-card" id="landing-recents" style="display:none">
             <h2>&#128337; Recent</h2>
-            <ul>
-                {% for loc in recent_searches %}
-                <li><a href="{{ url_for('weather', location=loc) }}">{{ loc }}</a></li>
-                {% endfor %}
-            </ul>
+            <ul id="recents-list"></ul>
         </div>
-        {% endif %}
     </div>
-    {% endif %}
 </div>
 {% endblock %}
 
@@ -75,6 +61,7 @@
     document.addEventListener('DOMContentLoaded', function() {
         Clearcast.initAutocomplete('landing-search-input', 'landing-suggestions');
         Clearcast.initUseLocation('.landing .use-location-btn');
+        Clearcast.renderLandingLists();
     });
 </script>
 {% endblock %}

@@ -18,6 +18,9 @@
     --shadow-lg: 0 8px 48px rgba(0, 0, 0, 0.4);
     --glass: rgba(26, 35, 50, 0.65);
     --glass-border: rgba(88, 166, 255, 0.12);
+    --transition-fast: 0.15s ease;
+    --transition: 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+    --transition-slow: 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .theme-light {
@@ -57,7 +60,7 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
-/* ─── Animated background (matching homepage) ─── */
+/* ─── Animated background ─── */
 .bg-gradient {
     position: fixed;
     inset: 0;
@@ -103,7 +106,7 @@ body {
     100% { transform: translate(-20px, 20px) scale(0.95); }
 }
 
-/* ─── Navigation (matching homepage) ─── */
+/* ─── Navigation ─── */
 .nav {
     position: fixed;
     top: 0;
@@ -111,7 +114,7 @@ body {
     right: 0;
     z-index: 100;
     padding: 0 2rem;
-    transition: background 0.3s, box-shadow 0.3s, backdrop-filter 0.3s;
+    transition: background var(--transition), box-shadow var(--transition), backdrop-filter var(--transition);
 }
 
 .nav.scrolled {
@@ -141,7 +144,7 @@ body {
     align-items: center;
     gap: 0.5rem;
     flex-shrink: 0;
-    transition: color 0.2s;
+    transition: color var(--transition-fast);
 }
 
 .nav-brand:hover {
@@ -180,7 +183,7 @@ body {
     font-family: inherit;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    transition: border-color 0.2s, background 0.2s;
+    transition: border-color var(--transition-fast), background var(--transition-fast);
 }
 
 .nav-search-input::placeholder {
@@ -205,7 +208,7 @@ body {
     color: #fff;
     cursor: pointer;
     flex-shrink: 0;
-    transition: background 0.2s, transform 0.2s;
+    transition: background var(--transition-fast), transform var(--transition-fast);
 }
 
 .nav-search-btn:hover {
@@ -225,7 +228,7 @@ body {
     color: var(--text-muted);
     cursor: pointer;
     flex-shrink: 0;
-    transition: background 0.2s, color 0.2s;
+    transition: background var(--transition-fast), color var(--transition-fast);
 }
 
 .btn-icon:hover {
@@ -282,7 +285,7 @@ body {
     color: var(--text);
     text-align: left;
     width: 100%;
-    transition: background 0.15s;
+    transition: background var(--transition-fast);
 }
 
 .suggestion-item:hover,
@@ -295,7 +298,7 @@ body {
     outline-offset: -2px;
 }
 
-/* ─── Buttons (matching homepage) ─── */
+/* ─── Buttons ─── */
 .btn {
     padding: 0.55rem 1.15rem;
     border: none;
@@ -309,7 +312,7 @@ body {
     align-items: center;
     justify-content: center;
     gap: 0.4rem;
-    transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+    transition: transform var(--transition-fast), box-shadow var(--transition), background var(--transition-fast);
 }
 
 .btn:hover {
@@ -359,6 +362,13 @@ body {
     opacity: 0.5;
     cursor: not-allowed;
     transform: none;
+}
+
+.fav-btn-group {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
 }
 
 /* ─── Loading overlay ─── */
@@ -414,7 +424,7 @@ body {
     min-height: calc(100vh - 180px);
 }
 
-/* ─── Section label (matching homepage) ─── */
+/* ─── Section label ─── */
 .section-label {
     display: inline-block;
     font-size: 0.8rem;
@@ -529,7 +539,7 @@ body {
     font-family: inherit;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    transition: border-color 0.2s, box-shadow 0.2s;
+    transition: border-color var(--transition-fast), box-shadow var(--transition);
 }
 
 .landing-input::placeholder {
@@ -571,7 +581,7 @@ body {
     border-radius: var(--radius);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    transition: transform 0.3s, box-shadow 0.3s;
+    transition: transform var(--transition), box-shadow var(--transition);
 }
 
 .landing-section-card:hover {
@@ -606,7 +616,7 @@ body {
     text-decoration: none;
     border-radius: var(--radius-sm);
     font-size: 0.9rem;
-    transition: background 0.15s;
+    transition: background var(--transition-fast);
 }
 
 .landing-section-card a:hover {
@@ -636,11 +646,11 @@ body {
 .location-updated {
     font-size: 0.9rem;
     color: var(--text-muted);
-    margin: 0;
+    margin: 0 0 0.5rem;
 }
 
-.dashboard-hero .fav-toggle-btn {
-    margin-top: 0.5rem;
+.fav-toggle-wrap {
+    margin-top: 0.25rem;
 }
 
 /* ─── Section navigation pills ─── */
@@ -668,7 +678,7 @@ body {
     color: var(--text-muted);
     text-decoration: none;
     border-radius: var(--radius-sm);
-    transition: color 0.2s, background 0.2s, transform 0.2s;
+    transition: color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast);
     white-space: nowrap;
 }
 
@@ -722,7 +732,7 @@ body {
     text-decoration: none;
     border-radius: 999px;
     border: 1px solid var(--border);
-    transition: background 0.2s, transform 0.2s;
+    transition: background var(--transition-fast), transform var(--transition-fast), color var(--transition-fast);
     font-weight: 500;
 }
 
@@ -740,7 +750,7 @@ body {
     border-radius: var(--radius);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    transition: transform 0.3s, box-shadow 0.3s;
+    transition: transform var(--transition), box-shadow var(--transition);
 }
 
 .glass-card:hover {
@@ -752,7 +762,7 @@ body {
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    transition: transform 0.3s, box-shadow 0.3s;
+    transition: transform var(--transition), box-shadow var(--transition);
 }
 
 /* ─── Dashboard section ─── */
@@ -774,7 +784,7 @@ body {
     overflow: hidden;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    transition: transform 0.2s, box-shadow 0.2s;
+    transition: transform var(--transition-fast), box-shadow var(--transition);
 }
 
 .alert-card:hover {
@@ -875,7 +885,7 @@ body {
     font-size: 0.7rem;
     color: var(--accent);
     margin-top: 0.5rem;
-    transition: transform 0.3s;
+    transition: transform var(--transition);
 }
 
 .alert-card[data-expanded="true"] .expand-chevron {
@@ -906,7 +916,7 @@ body {
 }
 
 .no-alerts-state {
-    padding: 2rem;
+    padding: 2.5rem;
     text-align: center;
     background: var(--glass);
     border-radius: var(--radius);
@@ -919,11 +929,11 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 48px;
-    height: 48px;
+    width: 52px;
+    height: 52px;
     margin: 0 auto 0.75rem;
     background: rgba(63, 185, 80, 0.1);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius);
     font-size: 1.5rem;
     color: var(--success);
 }
@@ -1014,7 +1024,7 @@ body {
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
-    transition: background 0.2s, transform 0.2s;
+    transition: background var(--transition-fast), transform var(--transition-fast), color var(--transition-fast);
     align-self: flex-start;
 }
 
@@ -1024,10 +1034,53 @@ body {
     transform: translateY(-1px);
 }
 
+/* Observation source in expanded details */
+.observation-source {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 1rem 1.25rem;
+    background: linear-gradient(135deg, rgba(88, 166, 255, 0.06), rgba(63, 185, 80, 0.04));
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    margin-bottom: 1rem;
+}
+
+.observation-source-icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+    margin-top: 0.1rem;
+}
+
+.observation-source-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+}
+
+.observation-source-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+}
+
+.observation-source-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.observation-source-time {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
 /* Details grid (expanded) */
 .details-expandable {
     overflow: hidden;
-    transition: max-height 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: max-height var(--transition-slow);
 }
 
 .details-grid {
@@ -1046,8 +1099,12 @@ body {
     gap: 0.2rem;
 }
 
+.detail-item-wide {
+    grid-column: span 2;
+}
+
 .detail-label {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     font-weight: 600;
     color: var(--text-muted);
     text-transform: uppercase;
@@ -1076,11 +1133,12 @@ body {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
-    transition: transform 0.2s;
+    transition: transform var(--transition-fast), box-shadow var(--transition);
 }
 
 .quick-stat:hover {
     transform: translateY(-2px);
+    box-shadow: var(--shadow);
 }
 
 .quick-stat-label {
@@ -1139,7 +1197,7 @@ body {
     flex-direction: column;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+    transition: transform var(--transition-fast), box-shadow var(--transition), border-color var(--transition-fast);
 }
 
 .hourly-card:hover {
@@ -1226,7 +1284,7 @@ body {
     text-align: center;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    transition: transform 0.3s, box-shadow 0.3s, border-color 0.3s;
+    transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
 }
 
 .daily-card:hover {
@@ -1301,7 +1359,7 @@ body {
     font-size: 0.7rem;
     color: var(--accent);
     opacity: 0;
-    transition: opacity 0.2s;
+    transition: opacity var(--transition-fast);
 }
 
 .daily-card:hover .daily-view-hint {
@@ -1331,6 +1389,147 @@ body {
     width: 100%;
     height: 450px;
     min-height: 300px;
+}
+
+/* ─── Radar controls ─── */
+.radar-controls {
+    padding: 1rem 1.25rem;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border);
+}
+
+.radar-controls-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.radar-play-btn {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--bg-elevated);
+    color: var(--accent);
+    font-size: 1rem;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background var(--transition-fast), transform var(--transition-fast), color var(--transition-fast);
+}
+
+.radar-play-btn:hover {
+    background: var(--accent);
+    color: #fff;
+    transform: scale(1.05);
+}
+
+.radar-slider {
+    flex: 1;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: var(--border);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+}
+
+.radar-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg-card);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+    transition: transform var(--transition-fast);
+}
+
+.radar-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+}
+
+.radar-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg-card);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    cursor: pointer;
+}
+
+.radar-time-label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    min-width: 72px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.radar-type-badge {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    white-space: nowrap;
+}
+
+.radar-type-badge.radar-observed {
+    background: rgba(63, 185, 80, 0.15);
+    color: var(--success);
+}
+
+.radar-type-badge.radar-forecast {
+    background: rgba(210, 153, 34, 0.15);
+    color: var(--warning);
+}
+
+.radar-quick-row {
+    margin-top: 0.75rem;
+    gap: 0.5rem;
+    justify-content: center;
+}
+
+.radar-quick-btn {
+    padding: 0.35rem 0.85rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--text-muted);
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.radar-quick-btn:hover {
+    color: var(--text);
+    background: var(--glass);
+}
+
+.radar-quick-btn.active {
+    color: #fff;
+    background: var(--accent);
+    border-color: var(--accent);
+}
+
+.radar-disclaimer {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin: 0.75rem 0 0;
+    text-align: center;
+    opacity: 0.8;
+    line-height: 1.4;
 }
 
 /* ─── Dashboard actions ─── */
@@ -1374,7 +1573,7 @@ body {
     font-size: 0.9rem;
     font-weight: 500;
     margin-bottom: 1rem;
-    transition: opacity 0.2s;
+    transition: opacity var(--transition-fast);
 }
 
 .day-detail-back:hover {
@@ -1406,7 +1605,6 @@ body {
     margin: 0;
 }
 
-/* Day navigation */
 .day-nav {
     display: flex;
     justify-content: center;
@@ -1424,7 +1622,7 @@ body {
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-sm);
     text-decoration: none;
-    transition: background 0.2s, color 0.2s, transform 0.2s;
+    transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
@@ -1451,11 +1649,12 @@ body {
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     text-align: center;
-    transition: transform 0.2s;
+    transition: transform var(--transition-fast), box-shadow var(--transition);
 }
 
 .day-summary-card:hover {
     transform: translateY(-2px);
+    box-shadow: var(--shadow);
 }
 
 .day-summary-card-icon {
@@ -1500,7 +1699,7 @@ body {
     border: none;
     border-radius: var(--radius-sm);
     cursor: pointer;
-    transition: color 0.2s, background 0.2s;
+    transition: color var(--transition-fast), background var(--transition-fast);
 }
 
 .detail-tab:hover {
@@ -1555,7 +1754,7 @@ body {
     margin: 0;
 }
 
-/* Day hourly table */
+/* Day hourly grid */
 .day-hourly-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
@@ -1570,7 +1769,7 @@ body {
     text-align: center;
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    transition: transform 0.2s, border-color 0.2s;
+    transition: transform var(--transition-fast), border-color var(--transition-fast);
 }
 
 .day-hourly-card:hover {
@@ -1640,9 +1839,18 @@ body {
 
 .no-data-message {
     text-align: center;
-    padding: 2rem;
+    padding: 3rem 2rem;
     color: var(--text-muted);
     font-size: 0.9rem;
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+}
+
+.no-data-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+    opacity: 0.5;
 }
 
 /* ─── Periods (fallback) ─── */
@@ -1659,7 +1867,7 @@ body {
     border-radius: var(--radius);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    transition: transform 0.2s;
+    transition: transform var(--transition-fast);
 }
 
 .period-card:hover {
@@ -1783,7 +1991,7 @@ body {
     justify-content: center;
 }
 
-/* ─── Footer (matching homepage) ─── */
+/* ─── Footer ─── */
 .footer {
     border-top: 1px solid var(--border);
     padding: 3rem 2rem;
@@ -1826,7 +2034,7 @@ body {
     font-size: 0.9rem;
     color: var(--text-muted);
     text-decoration: none;
-    transition: color 0.2s;
+    transition: color var(--transition-fast);
 }
 
 .footer-link:hover {
@@ -1866,7 +2074,7 @@ body {
 /* ─── Expandable sections ─── */
 .expandable {
     overflow: hidden;
-    transition: max-height 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    transition: max-height var(--transition-slow);
 }
 
 .expandable[hidden] {
@@ -1972,6 +2180,21 @@ body {
         min-height: 250px;
     }
 
+    .radar-controls {
+        padding: 0.75rem 1rem;
+    }
+
+    .radar-controls-row {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .radar-slider {
+        min-width: 0;
+        order: 10;
+        flex-basis: 100%;
+    }
+
     .day-summary-grid {
         grid-template-columns: repeat(2, 1fr);
     }
@@ -2014,5 +2237,11 @@ body {
 
     .day-detail-header {
         padding-top: 0.5rem;
+    }
+
+    .observation-source {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
     }
 }
