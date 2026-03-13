@@ -904,7 +904,7 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
 
     if lat is not None and lon is not None and get_sunrise_sunset:
         try:
-            sun = get_sunrise_sunset(lat, lon)
+            sun = get_sunrise_sunset(lat, lon, tz_name=tz)
             details["sunrise"] = sun.get("sunrise", "\u2014")
             details["sunset"] = sun.get("sunset", "\u2014")
         except Exception:
