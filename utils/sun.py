@@ -2,10 +2,16 @@
 Sunrise/sunset calculation (NOAA algorithm).
 Pure Python, no external dependencies.
 Based on NOAA Solar Calculator equations.
+Output is UTC; converted to local civil time using IANA timezone for DST correctness.
 """
 
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from math import sin, cos, tan, acos, radians, degrees
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    ZoneInfo = None
 
 
 def _julian_day(d):
@@ -16,14 +22,56 @@ def _julian_day(d):
     return d.day + (153 * m + 2) // 5 + 365 * y + y // 4 - y // 100 + y // 400 - 32045
 
 
-def get_sunrise_sunset(lat, lon, d=None):
+def _mins_to_str_longitude_fallback(mins_from_midnight_utc, lon):
+    """
+    Fallback: convert UTC minutes to local using longitude approximation.
+    Does NOT account for DST. Used only when timezone is unavailable.
+    """
+    offset_h = round(lon / 15)
+    offset_h = max(-12, min(12, offset_h))
+    utc_h = mins_from_midnight_utc / 60.0
+    h = int(utc_h) + offset_h
+    mn = int(round((utc_h % 1) * 60)) % 60
+    if h < 0:
+        h += 24
+    if h >= 24:
+        h -= 24
+    if h == 0:
+        return f"12:{mn:02d} AM"
+    if h < 12:
+        return f"{h}:{mn:02d} AM"
+    if h == 12:
+        return f"12:{mn:02d} PM"
+    return f"{h - 12}:{mn:02d} PM"
+
+
+def get_sunrise_sunset(lat, lon, d=None, tz_name=None):
     """
     Get sunrise and sunset times for a date at a location.
-    Returns dict with "sunrise" and "sunset" as "H:MM AM/PM" strings.
-    Uses approximate US timezone from longitude.
+
+    Uses NOAA algorithm which returns UTC. Converts to local civil time
+    using the IANA timezone (e.g. America/New_York) so DST is correct.
+
+    Args:
+        lat, lon: Location coordinates (degrees).
+        d: Date for calculation. If None, uses today at the location.
+        tz_name: IANA timezone (e.g. "America/New_York"). If None, falls
+                 back to longitude-based offset (no DST).
+
+    Returns:
+        Dict with "sunrise" and "sunset" as "H:MM AM/PM" strings in local time.
     """
+    # Use the correct date for the location to avoid wrong-day bugs
     if d is None:
-        d = date.today()
+        if tz_name and ZoneInfo:
+            try:
+                now_local = datetime.now(ZoneInfo(tz_name))
+                d = now_local.date()
+            except (KeyError, Exception):
+                d = date.today()
+        else:
+            d = date.today()
+
     try:
         jd = _julian_day(d) + 0.5
         n = jd - 2451545.0
@@ -56,8 +104,10 @@ def get_sunrise_sunset(lat, lon, d=None):
         cos_zen = cos(radians(zenith))
         arg = (cos_zen / (cos_lat * cos_decl)) - tan_lat * tan_decl
         if arg > 1 or arg < -1:
-            return {"sunrise": "—", "sunset": "—"}
+            return {"sunrise": "\u2014", "sunset": "\u2014"}
         ha = degrees(acos(arg))
+
+        # NOAA formula outputs UTC minutes from midnight
         sunrise_min = 720 - 4 * (lon + ha) - eqtime
         sunset_min = 720 - 4 * (lon - ha) - eqtime
         if sunrise_min < 0:
@@ -69,28 +119,34 @@ def get_sunrise_sunset(lat, lon, d=None):
         if sunset_min >= 1440:
             sunset_min -= 1440
 
-        offset_h = round(lon / 15)
-        offset_h = max(-12, min(0, offset_h))
+        if tz_name and ZoneInfo:
+            try:
+                tz = ZoneInfo(tz_name)
+                # Build UTC datetime for this date at the computed minutes
+                midnight_utc = datetime(d.year, d.month, d.day, 0, 0, 0, tzinfo=timezone.utc)
+                sunrise_utc = midnight_utc + timedelta(minutes=sunrise_min)
+                sunset_utc = midnight_utc + timedelta(minutes=sunset_min)
+                # Convert to location's local time (handles DST)
+                sunrise_local = sunrise_utc.astimezone(tz)
+                sunset_local = sunset_utc.astimezone(tz)
+                # Format as "7:25 AM" (professional local format)
+                def fmt(dt):
+                    try:
+                        return dt.strftime("%-I:%M %p")
+                    except ValueError:
+                        return dt.strftime("%I:%M %p").lstrip("0") if dt.hour != 12 else dt.strftime("%I:%M %p")
 
-        def mins_to_str(m):
-            utc_h = m / 60.0
-            h = int(utc_h) + offset_h
-            mn = int(round((utc_h % 1) * 60)) % 60
-            if h < 0:
-                h += 24
-            if h >= 24:
-                h -= 24
-            if h == 0:
-                return f"12:{mn:02d} AM"
-            if h < 12:
-                return f"{h}:{mn:02d} AM"
-            if h == 12:
-                return f"12:{mn:02d} PM"
-            return f"{h - 12}:{mn:02d} PM"
+                return {
+                    "sunrise": fmt(sunrise_local),
+                    "sunset": fmt(sunset_local),
+                }
+            except (KeyError, ValueError, Exception):
+                pass
 
+        # Fallback: longitude-based (no DST)
         return {
-            "sunrise": mins_to_str(sunrise_min),
-            "sunset": mins_to_str(sunset_min),
+            "sunrise": _mins_to_str_longitude_fallback(sunrise_min, lon),
+            "sunset": _mins_to_str_longitude_fallback(sunset_min, lon),
         }
     except Exception:
-        return {"sunrise": "—", "sunset": "—"}
+        return {"sunrise": "\u2014", "sunset": "\u2014"}
