@@ -16,6 +16,11 @@ try:
 except ImportError:
     get_sunrise_sunset = None
 
+try:
+    from .precip_summary import generate_precip_summary
+except ImportError:
+    generate_precip_summary = None
+
 
 def _safe(value, default=""):
     return value if value is not None else default
@@ -57,6 +62,19 @@ def _short_time(s, tz_name=""):
         return dt.strftime("%-I %p")
     except (ValueError, TypeError):
         return ""
+
+
+def _extract_date(iso_str):
+    """Extract date string (YYYY-MM-DD) from ISO string."""
+    if not iso_str:
+        return None
+    try:
+        if "/" in str(iso_str):
+            iso_str = str(iso_str).split("/")[0]
+        dt = datetime.fromisoformat(str(iso_str).replace("Z", "+00:00"))
+        return dt.strftime("%Y-%m-%d")
+    except (ValueError, TypeError):
+        return None
 
 
 def _wind_string(direction, speed):
@@ -406,9 +424,72 @@ def _get_current_hourly_index(periods, tz_name=""):
         return 0
 
 
+def _parse_grid_precip_for_periods(grid_data, period_start_times):
+    """Extract precipitation amount (inches) for each period from forecastGridData.
+    Returns dict mapping period index -> precip amount in inches, or None if unavailable.
+    """
+    if not grid_data or not period_start_times:
+        return {}
+    out = {}
+    props = grid_data.get("properties", {})
+    qpf = props.get("quantitativePrecipitation") or {}
+    values = qpf.get("values", []) if isinstance(qpf, dict) else []
+    uom = str(qpf.get("uom", "")).lower() if isinstance(qpf, dict) else ""
+    # Convert mm to inches: 1 mm = 0.0393701 in
+    mm_to_in = 0.0393701
+    for i, start_iso in enumerate(period_start_times):
+        try:
+            if "/" in str(start_iso):
+                start_iso = str(start_iso).split("/")[0]
+            start_dt = datetime.fromisoformat(str(start_iso).replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            continue
+        best_val = None
+        best_diff = None
+        for v in values:
+            vt = v.get("validTime", "")
+            if not vt or "/" not in vt:
+                continue
+            part = vt.split("/")[0]
+            try:
+                v_dt = datetime.fromisoformat(part.replace("Z", "+00:00"))
+                diff = abs((v_dt - start_dt).total_seconds())
+                if best_diff is None or diff < best_diff:
+                    best_diff = diff
+                    val = v.get("value")
+                    if val is not None:
+                        try:
+                            mm = float(val)
+                            if "millim" in uom or "mm" in uom or "wmo" in uom:
+                                best_val = mm * mm_to_in
+                            else:
+                                best_val = mm
+                        except (TypeError, ValueError):
+                            pass
+            except (ValueError, TypeError):
+                continue
+        if best_val is not None and best_val >= 0:
+            out[i] = round(best_val, 2)
+    return out
+
+
+def _format_precip_amount(inches):
+    """Format precipitation amount for display."""
+    if inches is None or inches < 0:
+        return None
+    if inches == 0:
+        return "0 in"
+    if inches < 0.01:
+        return "<0.01 in"
+    if inches < 0.1:
+        return f"{inches:.2f} in"
+    return f"{inches:.1f} in"
+
+
 def normalize_weather_data(display_name, forecast, hourly, alerts_data,
                           observations_data=None, grid_data=None, lat=None, lon=None,
-                          station_name=None, station_id=None, timezone=""):
+                          station_name=None, station_id=None, station_lat=None, station_lon=None,
+                          timezone=""):
     """Build a single normalized dict for the dashboard template."""
 
     tz = timezone or ""
@@ -713,7 +794,18 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
                 "start_time": start,
                 "apparent_temp": f"{apparent}\u00b0F" if apparent is not None else "\u2014",
                 "apparent_temp_value": apparent,
+                "precip_amount_in": None,
+                "precip_amount_str": None,
             })
+
+    # Merge grid precipitation amounts into hourly cards
+    if grid_data and hourly_cards:
+        start_times = [h.get("start_time") for h in hourly_cards]
+        grid_precip = _parse_grid_precip_for_periods(grid_data, start_times)
+        for i, amt in grid_precip.items():
+            if i < len(hourly_cards):
+                hourly_cards[i]["precip_amount_in"] = amt
+                hourly_cards[i]["precip_amount_str"] = _format_precip_amount(amt)
 
     # --- Chart data from hourly forecast ---
     chart_hourly = []
@@ -746,7 +838,16 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
                 "wind": wind_speed_val,
                 "humidity": int(humidity_val) if humidity_val is not None else None,
                 "apparent_temp": apparent,
+                "precip_amount_in": None,
             })
+
+    # Merge grid precipitation amounts into chart data
+    if grid_data and chart_hourly:
+        start_times = [c.get("raw_start_time") for c in chart_hourly]
+        grid_precip = _parse_grid_precip_for_periods(grid_data, start_times)
+        for i, amt in grid_precip.items():
+            if i < len(chart_hourly):
+                chart_hourly[i]["precip_amount_in"] = amt
 
     current["icon"] = weather_icon(current.get("short_forecast", ""))
 
@@ -816,6 +917,48 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
     daily = _build_daily_forecast(periods)
     best_time = _compute_best_time(periods, hourly_cards)
 
+    # Short-term precipitation summary
+    precip_summary_short = None
+    if generate_precip_summary and hourly_cards:
+        precip_summary_short = generate_precip_summary(hourly_cards, lookahead_hours=6)
+
+    # Forecast issued/updated time from hourly response
+    forecast_issued = None
+    if hourly and "properties" in hourly:
+        update_time = hourly.get("properties", {}).get("updateTime")
+        if update_time:
+            try:
+                if "/" in str(update_time):
+                    update_time = str(update_time).split("/")[0]
+                dt = datetime.fromisoformat(str(update_time).replace("Z", "+00:00"))
+                dt = _to_local(dt, tz)
+                forecast_issued = dt.strftime("%a %b %-d, %-I:%M %p")
+            except (ValueError, TypeError):
+                pass
+
+    # Enrich daily with precip amount from hourly (max in that day)
+    if chart_hourly and daily:
+        for d in daily:
+            raw_start = d.get("raw_start_time")
+            if not raw_start:
+                continue
+            target_date = _extract_date(raw_start)
+            if not target_date:
+                continue
+            day_amounts = []
+            for ch in chart_hourly:
+                ch_date = _extract_date(ch.get("raw_start_time"))
+                if ch_date == target_date:
+                    amt = ch.get("precip_amount_in")
+                    if amt is not None and amt > 0:
+                        day_amounts.append(amt)
+            if day_amounts:
+                d["precip_amount_in"] = round(sum(day_amounts), 2)
+                d["precip_amount_str"] = _format_precip_amount(sum(day_amounts))
+            else:
+                d["precip_amount_in"] = None
+                d["precip_amount_str"] = None
+
     return {
         "location": display_name,
         "lat": lat,
@@ -828,6 +971,10 @@ def normalize_weather_data(display_name, forecast, hourly, alerts_data,
         "chart_hourly": chart_hourly,
         "details": details,
         "best_time": best_time,
+        "precip_summary_short": precip_summary_short,
+        "forecast_issued": forecast_issued,
+        "station_lat": station_lat,
+        "station_lon": station_lon,
     }
 
 

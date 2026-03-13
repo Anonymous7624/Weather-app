@@ -648,12 +648,24 @@ var Clearcast = (function () {
         pastCount: 0,
     };
 
-    function initRadar(lat, lon) {
+    function initRadar(opts) {
         var mapEl = document.getElementById('radar-map');
         if (!mapEl || typeof L === 'undefined') return;
 
-        lat = parseFloat(lat) || 39;
-        lon = parseFloat(lon) || -98;
+        var lat, lon, stationLat, stationLon, stationName, stationId, stationUpdated;
+        if (opts && typeof opts === 'object') {
+            lat = parseFloat(opts.lat) || 39;
+            lon = parseFloat(opts.lon) || -98;
+            stationLat = opts.stationLat != null && opts.stationLat !== '' ? parseFloat(opts.stationLat) : null;
+            stationLon = opts.stationLon != null && opts.stationLon !== '' ? parseFloat(opts.stationLon) : null;
+            stationName = opts.stationName || '';
+            stationId = opts.stationId || '';
+            stationUpdated = opts.stationUpdated || '';
+        } else {
+            lat = parseFloat(opts) || parseFloat(arguments[0]) || 39;
+            lon = parseFloat(arguments[1]) || -98;
+            stationLat = stationLon = null;
+        }
 
         var map = L.map('radar-map', {
             center: [lat, lon],
@@ -668,9 +680,31 @@ var Clearcast = (function () {
             maxZoom: 19,
         }).addTo(map);
 
-        L.marker([lat, lon]).addTo(map)
-            .bindPopup('Your location')
+        var userIcon = L.divIcon({
+            className: 'leaflet-marker-location',
+            html: '<span class="marker-pin marker-searched">\u2709</span>',
+            iconSize: [28, 28],
+            iconAnchor: [14, 14],
+        });
+        L.marker([lat, lon], { icon: userIcon }).addTo(map)
+            .bindPopup('<strong>Searched location</strong><br>' + (lat.toFixed(4) + ', ' + lon.toFixed(4)))
             .openPopup();
+
+        if (stationLat != null && stationLon != null && (stationLat !== lat || stationLon !== lon)) {
+            var stationIcon = L.divIcon({
+                className: 'leaflet-marker-station',
+                html: '<span class="marker-pin marker-station">\uD83D\uDCE1</span>',
+                iconSize: [28, 28],
+                iconAnchor: [14, 14],
+            });
+            var popupParts = ['<strong>Observation station</strong>'];
+            if (stationName) popupParts.push(stationName);
+            if (stationId) popupParts.push('(' + stationId + ')');
+            popupParts.push(stationLat.toFixed(4) + ', ' + stationLon.toFixed(4));
+            if (stationUpdated) popupParts.push('Recorded ' + stationUpdated);
+            L.marker([stationLat, stationLon], { icon: stationIcon }).addTo(map)
+                .bindPopup(popupParts.join('<br>'));
+        }
 
         mapEl._leaflet_map = map;
         radarState.map = map;
@@ -1160,25 +1194,73 @@ var Clearcast = (function () {
         if (precipEl) {
             var precipCanvas = document.createElement('canvas');
             precipEl.appendChild(precipCanvas);
+            var precipAmounts = chartData.map(function (d) {
+                var amt = d.precip_amount_in;
+                return (amt != null && amt > 0) ? amt : null;
+            });
+            var maxAmt = precipAmounts.reduce(function (m, v) {
+                return (v != null && v > m) ? v : m;
+            }, 0.1);
             new Chart(precipCanvas, {
                 type: 'bar',
                 data: {
                     labels: labels,
-                    datasets: [{
-                        label: 'Precip %',
-                        data: chartData.map(function (d) { return d.precip; }),
-                        backgroundColor: c.accent,
-                        borderRadius: 4,
-                    }],
+                    datasets: [
+                        {
+                            label: 'Amount (in)',
+                            data: precipAmounts.map(function (v) { return v != null ? v : 0; }),
+                            backgroundColor: c.accent,
+                            borderRadius: 4,
+                            yAxisID: 'yAmount',
+                        },
+                        {
+                            label: 'Chance %',
+                            data: chartData.map(function (d) { return d.precip; }),
+                            type: 'line',
+                            borderColor: c.warning,
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            tension: 0.4,
+                            fill: false,
+                            yAxisID: 'yChance',
+                        },
+                    ],
                 },
                 options: Object.assign({}, baseOpts, {
                     scales: Object.assign({}, baseOpts.scales, {
-                        y: Object.assign({}, baseOpts.scales.y, { min: 0, max: 100 }),
+                        yAmount: {
+                            type: 'linear',
+                            position: 'left',
+                            min: 0,
+                            max: Math.max(0.5, maxAmt * 1.2),
+                            ticks: { color: baseOpts.scales.y.ticks.color, font: baseOpts.scales.y.ticks.font },
+                            grid: { color: baseOpts.scales.y.grid.color },
+                            title: { display: true, text: 'Amount (in)', color: baseOpts.scales.y.ticks.color },
+                        },
+                        yChance: {
+                            type: 'linear',
+                            position: 'right',
+                            min: 0,
+                            max: 100,
+                            ticks: { color: baseOpts.scales.y.ticks.color, font: baseOpts.scales.y.ticks.font },
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: 'Chance %', color: baseOpts.scales.y.ticks.color },
+                        },
+                        y: undefined,
                     }),
                     plugins: Object.assign({}, baseOpts.plugins, {
+                        legend: { display: true, labels: { color: c.text, usePointStyle: true } },
                         tooltip: Object.assign({}, baseOpts.plugins.tooltip, {
+                            displayColors: true,
                             callbacks: {
-                                label: function (ctx) { return (ctx.parsed.y || 0) + '%'; },
+                                label: function (ctx) {
+                                    if (ctx.dataset.label === 'Amount (in)') {
+                                        var v = ctx.parsed.y;
+                                        return v > 0 ? v.toFixed(2) + ' in' : '0 in';
+                                    }
+                                    return (ctx.parsed.y || 0) + '% chance';
+                                },
                             },
                         }),
                     }),

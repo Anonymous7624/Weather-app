@@ -26,9 +26,11 @@ def _get(url):
 
 
 def _fetch_observations(stations_data):
-    """Extract station info and fetch latest observation. Returns tuple."""
+    """Extract station info, coordinates, and fetch latest observation. Returns tuple."""
     station_name = None
     station_id = None
+    station_lat = None
+    station_lon = None
     observations_data = None
 
     if stations_data and "features" in stations_data and stations_data["features"]:
@@ -36,11 +38,18 @@ def _fetch_observations(stations_data):
         station_props = first_station.get("properties", {})
         station_id = station_props.get("stationIdentifier")
         station_name = station_props.get("name")
+        # GeoJSON: coordinates are [longitude, latitude]
+        geom = first_station.get("geometry")
+        if geom and geom.get("type") == "Point":
+            coords = geom.get("coordinates")
+            if coords and len(coords) >= 2:
+                station_lon = round(float(coords[0]), COORD_PRECISION)
+                station_lat = round(float(coords[1]), COORD_PRECISION)
         if station_id:
             obs_url = f"{NWS_BASE}/stations/{station_id}/observations?limit=1"
             observations_data = _get(obs_url)
 
-    return station_name, station_id, observations_data
+    return station_name, station_id, station_lat, station_lon, observations_data
 
 
 def fetch_weather_data(lat, lon, display_name):
@@ -91,7 +100,7 @@ def fetch_weather_data(lat, lon, display_name):
     alerts_data = results.get("alerts")
     grid_data = results.get("grid")
 
-    station_name, station_id, observations_data = _fetch_observations(
+    station_name, station_id, station_lat, station_lon, observations_data = _fetch_observations(
         results.get("stations")
     )
 
@@ -106,5 +115,7 @@ def fetch_weather_data(lat, lon, display_name):
         grid_data=grid_data,
         station_name=station_name,
         station_id=station_id,
+        station_lat=station_lat,
+        station_lon=station_lon,
         timezone=timezone,
     )
