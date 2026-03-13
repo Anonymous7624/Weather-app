@@ -137,7 +137,7 @@
                 {% endif %}
                 <div class="day-hourly-desc">{{ h.short_forecast }}</div>
                 <div class="day-hourly-meta">
-                    &#128167; {{ h.precip }}<br>
+                    &#128167; {{ h.precip }}{% if h.precip_amount_str %} · {{ h.precip_amount_str }}{% endif %}<br>
                     &#127788;&#65039; {{ h.wind }}
                 </div>
             </div>
@@ -164,7 +164,7 @@
                 <div class="chart-container" id="day-apparent-chart"></div>
             </div>
             <div class="chart-card">
-                <h4>&#128167; Precipitation Chance</h4>
+                <h4>&#128167; Precipitation Chance &amp; Amount</h4>
                 <div class="chart-container" id="day-precip-chart"></div>
             </div>
             <div class="chart-card">
@@ -213,7 +213,7 @@
             {% endif %}
             <div class="day-summary-card">
                 <div class="day-summary-card-label">Precipitation</div>
-                <div class="day-summary-card-value">{{ day.precip_chance }}</div>
+                <div class="day-summary-card-value">{{ day.precip_chance }}{% if day.precip_amount_str %} · {{ day.precip_amount_str }}{% endif %}</div>
             </div>
             <div class="day-summary-card">
                 <div class="day-summary-card-label">Wind</div>

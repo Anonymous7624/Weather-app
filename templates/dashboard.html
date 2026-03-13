@@ -72,6 +72,7 @@
     <section id="current" class="dashboard-section reveal" data-section="current">
         <h2 class="section-title">
             <span class="section-title-icon">&#127780;</span> Current Conditions
+            <span class="section-badge section-badge-observed">Observed</span>
             {% if weather.daily %}
             <a href="{{ url_for('weather_day', day_index=0, location=location_input) }}" class="section-detail-link">View today's full forecast &rarr;</a>
             {% endif %}
@@ -83,7 +84,7 @@
                     <div class="current-temp-block">
                         <span class="current-temp">{{ weather.current.temp }}</span>
                         {% if weather.current.feels_like and weather.current.feels_like != '—' and weather.current.feels_like != weather.current.temp %}
-                        <span class="current-feels">Feels like {{ weather.current.feels_like }}</span>
+                        <span class="current-feels">Real Feel {{ weather.current.feels_like }}</span>
                         {% endif %}
                     </div>
                 </div>
@@ -165,6 +166,12 @@
                 </div>
             </div>
             <div class="quick-stats-grid">
+                {% if weather.current.feels_like and weather.current.feels_like != '—' %}
+                <div class="quick-stat quick-stat-real-feel">
+                    <span class="quick-stat-label">Real Feel</span>
+                    <span class="quick-stat-value">{{ weather.current.feels_like }}</span>
+                </div>
+                {% endif %}
                 <div class="quick-stat">
                     <span class="quick-stat-label">Wind</span>
                     <span class="quick-stat-value">{{ weather.current.wind }}</span>
@@ -192,15 +199,26 @@
     </section>
     {% endif %}
 
+    {% if weather.precip_summary_short %}
+    <section class="precip-summary-section reveal">
+        <span class="precip-summary-icon" aria-hidden="true">&#128167;</span>
+        <p class="precip-summary-text">{{ weather.precip_summary_short }}</p>
+    </section>
+    {% endif %}
+
     <!-- Hourly Forecast -->
     {% if weather.hourly %}
     <section id="hourly" class="dashboard-section reveal" data-section="hourly">
         <h2 class="section-title">
-            <span class="section-title-icon">&#128200;</span> Next 24 Hours
+            <span class="section-title-icon">&#128200;</span> 24-Hour Forecast
+            <span class="section-badge section-badge-forecast">Forecast</span>
             {% if weather.daily %}
             <a href="{{ url_for('weather_day', day_index=0, location=location_input) }}" class="section-detail-link">Full day view &rarr;</a>
             {% endif %}
         </h2>
+        {% if weather.forecast_issued %}
+        <p class="hourly-forecast-meta">Forecast issued {{ weather.forecast_issued }}. Predicted values may differ from current observed conditions.</p>
+        {% endif %}
         <div class="hourly-scroll">
             {% for h in weather.hourly[:24] %}
             <div class="hourly-card" data-index="{{ loop.index0 }}" data-temp="{{ h.temp_value|default('') }}" data-precip="{{ h.precip_value|default('') }}"
@@ -212,7 +230,7 @@
                     {% if h.apparent_temp_value is not none and h.apparent_temp_value != h.temp_value %}
                     <span class="hourly-feels">Feels {{ h.apparent_temp }}</span>
                     {% endif %}
-                    <span class="hourly-precip">&#128167; {{ h.precip }}</span>
+                    <span class="hourly-precip">&#128167; {{ h.precip }}{% if h.precip_amount_str %} · {{ h.precip_amount_str }}{% endif %}</span>
                     <span class="hourly-desc">{{ h.short_forecast }}</span>
                 </button>
                 <div class="hourly-expandable expandable" hidden>
@@ -260,7 +278,7 @@
                     </div>
                     {% endif %}
                     <p class="daily-summary">{{ d.summary }}</p>
-                    <span class="daily-precip">&#128167; {{ d.precip_chance }}</span>
+                    <span class="daily-precip">&#128167; {{ d.precip_chance }}{% if d.precip_amount_str %} · {{ d.precip_amount_str }}{% endif %}</span>
                     <span class="daily-view-hint">View details &rarr;</span>
                 </a>
             </div>
@@ -293,9 +311,12 @@
     <!-- Radar -->
     <section id="radar" class="dashboard-section radar-section reveal" data-section="radar">
         <h2 class="section-title"><span class="section-title-icon">&#128225;</span> Radar &amp; Map</h2>
-        <p class="radar-hint">Centered on {{ weather.location }}</p>
+        <p class="radar-hint">Centered on {{ weather.location }}{% if weather.details.station_name or weather.station_lat %}. Observation data from {% if weather.details.station_name %}{{ weather.details.station_name }}{% else %}nearest station{% endif %}{% endif %}</p>
         <div class="radar-container">
-            <div id="radar-map" class="radar-map" data-lat="{{ weather.lat|default(39) }}" data-lon="{{ weather.lon|default(-98) }}"></div>
+            <div id="radar-map" class="radar-map" data-lat="{{ weather.lat|default(39) }}" data-lon="{{ weather.lon|default(-98) }}"
+                 data-station-lat="{{ weather.station_lat|default('') }}" data-station-lon="{{ weather.station_lon|default('') }}"
+                 data-station-name="{{ weather.details.station_name|default('')|e }}" data-station-id="{{ weather.details.station_id|default('')|e }}"
+                 data-station-updated="{{ weather.current.last_updated_full|default('')|e }}"></div>
             <div class="radar-controls" id="radar-controls" style="display:none">
                 <div class="radar-controls-row">
                     <button type="button" id="radar-play" class="radar-play-btn" title="Play/Pause" aria-label="Play radar animation">&#9654;</button>
@@ -360,12 +381,17 @@
             lat: {{ weather.lat|default(39)|tojson }},
             lon: {{ weather.lon|default(-98)|tojson }},
             chartHourly: {{ chart_hourly|tojson }},
-            refreshInterval: 600000
+            refreshInterval: 600000,
+            stationLat: {{ weather.station_lat|tojson or 'null' }},
+            stationLon: {{ weather.station_lon|tojson or 'null' }},
+            stationName: {{ weather.details.station_name|default('')|tojson }},
+            stationId: {{ weather.details.station_id|default('')|tojson }},
+            stationUpdated: {{ weather.current.last_updated_full|default('')|tojson }}
         };
         Clearcast.initDashboard(weatherData);
         Clearcast.initAutocomplete('header-search-input', 'search-suggestions');
         Clearcast.initUseLocation('.nav .use-location-btn');
-        Clearcast.initRadar(weatherData.lat, weatherData.lon);
+        Clearcast.initRadar(weatherData);
         Clearcast.initSectionNav();
         Clearcast.initExpandableCards();
         Clearcast.initCharts(weatherData.chartHourly);

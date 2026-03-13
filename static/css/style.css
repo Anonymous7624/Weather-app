@@ -2359,6 +2359,71 @@ body {
     vertical-align: middle;
 }
 
+.section-badge-observed {
+    background: rgba(63, 185, 80, 0.15);
+    color: var(--success);
+}
+
+.section-badge-forecast {
+    background: rgba(88, 166, 255, 0.15);
+    color: var(--accent);
+}
+
+/* ─── Short-term precipitation summary ─── */
+.precip-summary-section {
+    padding: 1rem 1.5rem;
+    background: linear-gradient(135deg, rgba(88, 166, 255, 0.08), rgba(63, 185, 80, 0.06));
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.precip-summary-icon {
+    font-size: 1.25rem;
+    flex-shrink: 0;
+}
+
+.precip-summary-text {
+    font-size: 0.95rem;
+    color: var(--text);
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* ─── Hourly forecast metadata ─── */
+.hourly-forecast-meta {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin: -0.5rem 0 0.75rem;
+    line-height: 1.4;
+}
+
+/* ─── Map markers (Leaflet) ─── */
+.leaflet-marker-location .marker-pin,
+.leaflet-marker-station .marker-pin {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    font-size: 0.9rem;
+}
+
+.marker-pin.marker-searched {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(88, 166, 255, 0.4);
+}
+
+.marker-pin.marker-station {
+    background: var(--success);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(63, 185, 80, 0.4);
+}
+
 /* ─── Responsive ─── */
 @media (max-width: 900px) {
     .current-grid {
