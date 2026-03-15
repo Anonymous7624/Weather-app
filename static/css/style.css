@@ -1013,6 +1013,57 @@ body {
     margin: 0;
 }
 
+/* ─── Past 7 Days history ─── */
+.history-collecting-msg {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+}
+
+.history-chart-container {
+    margin-bottom: 1.5rem;
+}
+
+.history-chart-container canvas,
+.history-chart-wrap canvas {
+    max-height: 180px;
+}
+
+.history-charts-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.history-chart-wrap {
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    min-height: 180px;
+}
+
+.no-history-state {
+    padding: 2.5rem;
+    text-align: center;
+    background: var(--glass);
+    border-radius: var(--radius);
+    border: 1px solid var(--glass-border);
+}
+
+.no-history-icon {
+    font-size: 2rem;
+    display: block;
+    margin-bottom: 0.75rem;
+    opacity: 0.7;
+}
+
+.no-history-msg {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    margin: 0;
+}
+
 /* ─── Current conditions ─── */
 .current-grid {
     display: grid;

@@ -4,6 +4,7 @@ An intelligent, lightweight weather dashboard for Raspberry Pi. Uses the officia
 
 ## Features
 
+- **Past 7 Days** – Historical hourly weather (temperature, feels like, precipitation, wind, humidity) from Open-Meteo Archive API, stored in SQLite with rolling retention
 - **Smart location** – Autocomplete search (ZIP, city/state, lat/lon), keyboard navigation, "Use My Location" via geolocation
 - **Persistent location** – Selected location persists across sessions; favorites and recent searches
 - **Built-in radar** – Map-based radar view inside the app, centered on your location (Leaflet + OpenStreetMap + NWS radar overlay)
@@ -13,6 +14,7 @@ An intelligent, lightweight weather dashboard for Raspberry Pi. Uses the officia
 - **Alerts** – Clear severity, timing, expandable full detail; calm "No active alerts" state
 - **Dark/light mode** – Theme toggle with system preference detection
 - **Mobile & desktop** – Responsive layout; radar usable on mobile
+- **Past 7 Days** – Historical hourly weather charts from stored data (SQLite + Open-Meteo)
 - **Raspberry Pi ready** – Minimal dependencies, 10-minute cache, runs on Pi 4 (4GB)
 - **Static homepage** – Polished product landing page suitable for GitHub Pages
 

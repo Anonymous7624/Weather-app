@@ -1384,6 +1384,169 @@ var Clearcast = (function () {
         hideLoading();
     }
 
+    /* ─── Past 7 Days history charts ─── */
+    function initHistoryCharts(chartData) {
+        if (typeof Chart === 'undefined' || !chartData || !chartData.length) return;
+        var c = getChartColors();
+        var labels = chartData.map(function (d) { return d.time; });
+        var baseOpts = chartDefaults();
+
+        var tempEl = document.getElementById('history-temp-chart');
+        if (tempEl && tempEl.parentNode) {
+            var tempCanvas = document.createElement('canvas');
+            tempEl.parentNode.replaceChild(tempCanvas, tempEl);
+            tempCanvas.id = 'history-temp-chart';
+            new Chart(tempCanvas, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Temperature (\u00b0F)',
+                        data: chartData.map(function (d) { return d.temp; }),
+                        borderColor: c.accent,
+                        backgroundColor: c.accentBg,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 2,
+                        borderWidth: 2,
+                    }],
+                },
+                options: Object.assign({}, baseOpts, {
+                    plugins: Object.assign({}, baseOpts.plugins, {
+                        tooltip: Object.assign({}, baseOpts.plugins.tooltip, {
+                            callbacks: { label: function (ctx) { return ctx.parsed.y + '\u00b0F'; } },
+                        }),
+                    }),
+                }),
+            });
+        }
+
+        var apparentEl = document.getElementById('history-apparent-chart');
+        if (apparentEl && apparentEl.parentNode) {
+            var apparentCanvas = document.createElement('canvas');
+            apparentEl.parentNode.replaceChild(apparentCanvas, apparentEl);
+            apparentCanvas.id = 'history-apparent-chart';
+            new Chart(apparentCanvas, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Feels Like (\u00b0F)',
+                        data: chartData.map(function (d) { return d.apparent_temp; }),
+                        borderColor: c.orange,
+                        backgroundColor: c.orangeBg,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 2,
+                        borderWidth: 2,
+                    }],
+                },
+                options: Object.assign({}, baseOpts, {
+                    plugins: Object.assign({}, baseOpts.plugins, {
+                        tooltip: Object.assign({}, baseOpts.plugins.tooltip, {
+                            callbacks: { label: function (ctx) { return ctx.parsed.y + '\u00b0F'; } },
+                        }),
+                    }),
+                }),
+            });
+        }
+
+        var precipEl = document.getElementById('history-precip-chart');
+        if (precipEl && precipEl.parentNode) {
+            var precipCanvas = document.createElement('canvas');
+            precipEl.parentNode.replaceChild(precipCanvas, precipEl);
+            precipCanvas.id = 'history-precip-chart';
+            var amounts = chartData.map(function (d) {
+                var a = d.precip_amount_in;
+                return (a != null && a > 0) ? a : 0;
+            });
+            new Chart(precipCanvas, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Precip (in)',
+                        data: amounts,
+                        backgroundColor: c.accent,
+                        borderRadius: 4,
+                    }],
+                },
+                options: Object.assign({}, baseOpts, {
+                    scales: Object.assign({}, baseOpts.scales, {
+                        y: Object.assign({}, baseOpts.scales.y, { min: 0 }),
+                    }),
+                    plugins: Object.assign({}, baseOpts.plugins, {
+                        tooltip: Object.assign({}, baseOpts.plugins.tooltip, {
+                            callbacks: { label: function (ctx) { return ctx.parsed.y > 0 ? ctx.parsed.y.toFixed(2) + ' in' : '0 in'; } },
+                        }),
+                    }),
+                }),
+            });
+        }
+
+        var windEl = document.getElementById('history-wind-chart');
+        if (windEl && windEl.parentNode) {
+            var windCanvas = document.createElement('canvas');
+            windEl.parentNode.replaceChild(windCanvas, windEl);
+            windCanvas.id = 'history-wind-chart';
+            new Chart(windCanvas, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Wind (mph)',
+                        data: chartData.map(function (d) { return d.wind; }),
+                        borderColor: c.warning,
+                        backgroundColor: c.warningBg,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 2,
+                        borderWidth: 2,
+                    }],
+                },
+                options: Object.assign({}, baseOpts, {
+                    scales: Object.assign({}, baseOpts.scales, { y: Object.assign({}, baseOpts.scales.y, { min: 0 }) }),
+                    plugins: Object.assign({}, baseOpts.plugins, {
+                        tooltip: Object.assign({}, baseOpts.plugins.tooltip, {
+                            callbacks: { label: function (ctx) { return (ctx.parsed.y != null ? ctx.parsed.y : '—') + ' mph'; } },
+                        }),
+                    }),
+                }),
+            });
+        }
+
+        var humidEl = document.getElementById('history-humidity-chart');
+        if (humidEl && humidEl.parentNode) {
+            var humidCanvas = document.createElement('canvas');
+            humidEl.parentNode.replaceChild(humidCanvas, humidEl);
+            humidCanvas.id = 'history-humidity-chart';
+            new Chart(humidCanvas, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Humidity %',
+                        data: chartData.map(function (d) { return d.humidity; }),
+                        borderColor: c.success,
+                        backgroundColor: c.successBg,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 2,
+                        borderWidth: 2,
+                    }],
+                },
+                options: Object.assign({}, baseOpts, {
+                    scales: Object.assign({}, baseOpts.scales, { y: Object.assign({}, baseOpts.scales.y, { min: 0, max: 100 }) }),
+                    plugins: Object.assign({}, baseOpts.plugins, {
+                        tooltip: Object.assign({}, baseOpts.plugins.tooltip, {
+                            callbacks: { label: function (ctx) { return ctx.parsed.y + '%'; } },
+                        }),
+                    }),
+                }),
+            });
+        }
+    }
+
     function initDashboard(opts) {
         init();
         clearSearchBar();
@@ -1412,6 +1575,7 @@ var Clearcast = (function () {
         renderLandingLists: renderLandingLists,
         renderHourlyChart: renderHourlyChart,
         renderDayCharts: renderDayCharts,
+        initHistoryCharts: initHistoryCharts,
         showLoading: showLoading,
         hideLoading: hideLoading,
     };
