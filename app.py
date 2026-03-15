@@ -5,8 +5,13 @@ Favorites and recents are stored client-side via localStorage for per-user priva
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import Flask, render_template, request, redirect, url_for, jsonify, make_response
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    ZoneInfo = None
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -17,7 +22,31 @@ from utils.geocode import resolve_location, reverse_geocode, suggest_locations, 
 from utils.nws import fetch_weather_data
 from utils.cache import get_cached_weather, set_cached_weather
 
+# Past 7 Days historical weather (SQLite)
+try:
+    from utils.db import (
+        init_db,
+        ensure_location_tracked,
+        get_hourly_history,
+        get_history_day_count,
+        insert_hourly_rows,
+        prune_old_history,
+    )
+    from utils.historical import fetch_historical_hourly
+    _HISTORY_ENABLED = True
+except ImportError:
+    _HISTORY_ENABLED = False
+    init_db = lambda: None
+    ensure_location_tracked = lambda *a, **k: None
+    get_hourly_history = lambda *a, **k: []
+    get_history_day_count = lambda *a: 0
+    insert_hourly_rows = lambda *a, **k: 0
+    prune_old_history = lambda: 0
+    fetch_historical_hourly = lambda *a, **k: []
+
 app = Flask(__name__)
+if _HISTORY_ENABLED:
+    init_db()
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
 app.config["MAX_CONTENT_LENGTH"] = 1024
 
@@ -80,6 +109,35 @@ def _filter_chart_for_day(weather_data, day):
 def _coord_cache_key(lat, lon):
     """Normalize coordinates to a stable cache key."""
     return f"{round(float(lat), 4)},{round(float(lon), 4)}"
+
+
+def _format_history_for_chart(history_rows, tz_name=""):
+    """Convert DB history rows to chart_hourly format for JS charts."""
+    result = []
+    for r in history_rows:
+        ts = r.get("timestamp")
+        if not ts:
+            continue
+        try:
+            dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            if tz_name and ZoneInfo:
+                dt = dt.astimezone(ZoneInfo(tz_name))
+            time_str = dt.strftime("%I %p").lstrip("0").strip() or "12" + dt.strftime("%p")
+        except (ValueError, TypeError):
+            time_str = str(ts)[:16]
+        result.append({
+            "time": time_str,
+            "raw_start_time": ts,
+            "temp": r.get("temperature"),
+            "precip": r.get("precip_probability"),
+            "wind": r.get("wind_speed_mph"),
+            "humidity": r.get("humidity"),
+            "apparent_temp": r.get("apparent_temperature"),
+            "precip_amount_in": r.get("precip_amount_in"),
+        })
+    return result
 
 
 def _get_weather_for_location(location_input):
@@ -176,6 +234,31 @@ def weather():
                 location_input=loc,
             ), 502
 
+    # Past 7 Days: ensure location tracked, collect history, format for charts
+    history_chart = []
+    history_days_available = 0
+    history_days_total = 7
+    if _HISTORY_ENABLED:
+        try:
+            lat = weather_data.get("lat")
+            lon = weather_data.get("lon")
+            display_name = weather_data.get("location") or location_input
+            if lat is not None and lon is not None:
+                loc_id = ensure_location_tracked(display_name, lat, lon)
+                if loc_id:
+                    # Collect historical (fetch + store); prune old
+                    rows = fetch_historical_hourly(lat, lon, days=7)
+                    if rows:
+                        insert_hourly_rows(loc_id, rows)
+                    prune_old_history()
+                    # Get stored history and format for charts
+                    raw = get_hourly_history(loc_id, limit=256)
+                    tz = weather_data.get("timezone", "UTC")
+                    history_chart = _format_history_for_chart(raw, tz)
+                    history_days_available = get_history_day_count(loc_id)
+        except Exception:
+            pass
+
     nav_search_value = "" if is_coord_input(location_input) else location_input
     resp = make_response(render_template(
         "dashboard.html",
@@ -183,6 +266,9 @@ def weather():
         location_input=location_input,
         nav_search_value=nav_search_value,
         chart_hourly=weather_data.get("chart_hourly", []),
+        history_chart=history_chart,
+        history_days_available=history_days_available,
+        history_days_total=history_days_total,
     ))
     resp.set_cookie(COOKIE_LAST_LOCATION, location_input, max_age=COOKIE_MAX_AGE, samesite="Lax")
     return resp

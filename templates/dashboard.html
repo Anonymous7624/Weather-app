@@ -20,6 +20,7 @@
         <a href="#current" class="nav-pill active" data-section="current">Current</a>
         <a href="#hourly" class="nav-pill" data-section="hourly">Hourly</a>
         <a href="#extended" class="nav-pill" data-section="extended">7-Day</a>
+        <a href="#history" class="nav-pill" data-section="history">Past 7 Days</a>
         <a href="#radar" class="nav-pill" data-section="radar">Radar</a>
         <a href="#alerts" class="nav-pill" data-section="alerts">Alerts{% if weather.alerts %} ({{ weather.alerts|length }}){% endif %}</a>
     </nav>
@@ -345,20 +346,42 @@
     </section>
     {% endif %}
 
-    <!-- Past 3 Days — placeholder for future historical data support.
-         The NWS observations API can provide past station data via
-         /stations/{id}/observations?start=...&end=...
-         but this is not yet implemented. See TODO in utils/normalize.py
-         and app.py for the planned approach.
-    -->
-    <!--
+    <!-- Past 7 Days historical weather (SQLite + Open-Meteo) -->
     <section id="history" class="dashboard-section reveal" data-section="history">
-        <h2 class="section-title"><span class="section-title-icon">&#128197;</span> Past 3 Days <span class="section-badge">Observed</span></h2>
-        <div id="history-container" class="history-grid">
-            (historical daily cards would render here via JS or server)
+        <h2 class="section-title">
+            <span class="section-title-icon">&#128197;</span> Past 7 Days
+            <span class="section-badge section-badge-observed">Observed</span>
+        </h2>
+        {% if history_days_available is defined and history_days_available < 7 %}
+        <p class="history-collecting-msg">
+            Collecting history — {{ history_days_available|default(0) }} of 7 days available
+        </p>
+        {% endif %}
+        {% if history_chart and history_chart|length > 0 %}
+        <div class="history-chart-container">
+            <canvas id="history-temp-chart" aria-label="Past 7 days temperature"></canvas>
         </div>
+        <div class="history-charts-row">
+            <div class="history-chart-wrap">
+                <canvas id="history-apparent-chart" aria-label="Past 7 days feels like"></canvas>
+            </div>
+            <div class="history-chart-wrap">
+                <canvas id="history-precip-chart" aria-label="Past 7 days precipitation"></canvas>
+            </div>
+            <div class="history-chart-wrap">
+                <canvas id="history-wind-chart" aria-label="Past 7 days wind"></canvas>
+            </div>
+            <div class="history-chart-wrap">
+                <canvas id="history-humidity-chart" aria-label="Past 7 days humidity"></canvas>
+            </div>
+        </div>
+        {% else %}
+        <div class="no-history-state">
+            <span class="no-history-icon">&#128200;</span>
+            <p class="no-history-msg">No historical data yet for this location. View this location again to start collecting past 7 days of weather.</p>
+        </div>
+        {% endif %}
     </section>
-    -->
 
     <!-- Actions -->
     <div class="dashboard-actions reveal">
@@ -381,6 +404,7 @@
             lat: {{ weather.lat|default(39)|tojson }},
             lon: {{ weather.lon|default(-98)|tojson }},
             chartHourly: {{ chart_hourly|tojson }},
+            historyChart: {{ history_chart|default([])|tojson }},
             refreshInterval: 600000,
             stationLat: {{ weather.station_lat|tojson or 'null' }},
             stationLon: {{ weather.station_lon|tojson or 'null' }},
